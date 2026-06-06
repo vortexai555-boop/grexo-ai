@@ -1,0 +1,259 @@
+import React, { useEffect, useRef, useState } from "react";
+import api from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Globe, Sparkle, Code as CodeIcon, DownloadSimple, ArrowsClockwise, ClipboardText, MonitorPlay,
+} from "@phosphor-icons/react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+
+const SITE_TYPES = [
+  { v: "landing", l: "Landing Page" },
+  { v: "business", l: "Business Site" },
+  { v: "portfolio", l: "Portfolio" },
+  { v: "ecommerce", l: "E-commerce" },
+  { v: "restaurant", l: "Restaurant" },
+];
+
+const EXAMPLES = [
+  "Modern landing page for a coffee subscription brand called Brewly",
+  "Portfolio site for a UX designer named Maya with case studies",
+  "Restaurant website for a Japanese ramen bar called Ten Tora",
+  "E-commerce store for handmade ceramic lamps",
+];
+
+export default function WebsitePage() {
+  const { refresh } = useAuth();
+  const [description, setDescription] = useState("");
+  const [siteType, setSiteType] = useState("landing");
+  const [generating, setGenerating] = useState(false);
+  const [current, setCurrent] = useState(null); // { id, html, description }
+  const [history, setHistory] = useState([]);
+  const iframeRef = useRef(null);
+
+  const loadHistory = async () => {
+    try {
+      const r = await api.get("/website");
+      setHistory(r.data || []);
+    } catch (_e) { /* ignore */ }
+  };
+
+  useEffect(() => { loadHistory(); }, []);
+
+  const generate = async () => {
+    const desc = description.trim();
+    if (!desc || generating) return;
+    setGenerating(true);
+    setCurrent(null);
+    try {
+      const r = await api.post("/website/generate", { description: desc, site_type: siteType });
+      setCurrent(r.data);
+      toast.success("Your website is ready");
+      loadHistory();
+      refresh();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyCode = async () => {
+    if (!current?.html) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(current.html);
+      } else {
+        // Fallback for insecure contexts / older browsers
+        const ta = document.createElement("textarea");
+        ta.value = current.html;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("HTML copied to clipboard");
+    } catch (_e) {
+      toast.error("Clipboard blocked by browser. Use Download .html instead.");
+    }
+  };
+
+  const downloadHtml = () => {
+    if (!current?.html) return;
+    const blob = new Blob([current.html], { type: "text/html" });
+    saveAs(blob, `vortex-site-${current.id || Date.now()}.html`);
+  };
+
+  const downloadZip = async () => {
+    if (!current?.html) return;
+    const zip = new JSZip();
+    zip.file("index.html", current.html);
+    zip.file("README.md", `# VORTEX AI Generated Site\n\nPrompt: ${current.description || description}\nGenerated: ${new Date().toISOString()}\n\n## To preview\nOpen index.html in any browser.\n`);
+    const blob = await zip.generateAsync({ type: "blob" });
+    saveAs(blob, `vortex-site-${current.id || Date.now()}.zip`);
+  };
+
+  const openHistory = async (item) => {
+    setCurrent({ id: item.id, html: item.html, description: item.description });
+  };
+
+  return (
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <div className="max-w-7xl mx-auto p-6 lg:p-10">
+        <div className="text-mono-accent mb-2">Tool</div>
+        <h1 className="text-4xl font-light tracking-tighter">
+          Website <span className="text-gradient-cyan font-medium">Builder</span>
+        </h1>
+        <p className="mt-2 text-slate-400">Describe a site. Vortex generates a beautiful, responsive single-page HTML file with Claude Sonnet 4.5.</p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-8">
+          {/* Input panel */}
+          <div className="lg:col-span-4">
+            <div className="glass rounded-2xl p-6 sticky top-6">
+              <div className="text-mono-accent">Describe your website</div>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. A modern landing page for a coffee subscription brand called Brewly..."
+                className="mt-3 min-h-[140px] bg-vortex-elevated border-white/10 focus-visible:ring-vortex-cyan resize-none"
+                data-testid="website-prompt-input"
+              />
+              <div className="mt-4">
+                <div className="text-mono-accent mb-2">Site type</div>
+                <Select value={siteType} onValueChange={setSiteType}>
+                  <SelectTrigger className="bg-vortex-elevated border-white/10 h-11" data-testid="website-type-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SITE_TYPES.map((s) => (
+                      <SelectItem key={s.v} value={s.v} data-testid={`website-type-${s.v}`}>{s.l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={generate} disabled={generating || !description.trim()} className="mt-5 w-full h-12 btn-primary-vortex" data-testid="website-generate-btn">
+                {generating ? "Generating…" : <><Sparkle size={16} weight="fill" className="mr-2" /> Generate Website</>}
+              </Button>
+              <div className="mt-3 text-xs text-slate-500">Costs 3 credits per generation.</div>
+
+              <div className="mt-6">
+                <div className="text-mono-accent mb-2">Examples</div>
+                <div className="space-y-2">
+                  {EXAMPLES.map((e, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setDescription(e)}
+                      className="w-full text-left text-xs text-slate-400 hover:text-white px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/15 transition"
+                      data-testid={`website-example-${i}`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Output panel */}
+          <div className="lg:col-span-8">
+            <AnimatePresence mode="wait">
+              {generating ? (
+                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="glass rounded-2xl p-16 text-center">
+                  <Globe size={48} className="mx-auto text-vortex-cyan animate-vortex-pulse" />
+                  <div className="mt-6 text-xl">Crafting your website…</div>
+                  <div className="mt-2 text-slate-500 text-sm">Generating layout, design and content with Claude.</div>
+                  <div className="mt-6 flex items-center justify-center gap-1.5">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <span key={i} className="w-1.5 h-6 bg-vortex-cyan/40 rounded animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+                    ))}
+                  </div>
+                </motion.div>
+              ) : current ? (
+                <motion.div key="result" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                  <div className="glass rounded-2xl p-2">
+                    <Tabs defaultValue="preview" className="w-full">
+                      <div className="flex items-center justify-between p-3">
+                        <TabsList className="bg-vortex-elevated border border-white/5">
+                          <TabsTrigger value="preview" data-testid="website-tab-preview"><MonitorPlay size={14} className="mr-2" /> Preview</TabsTrigger>
+                          <TabsTrigger value="code" data-testid="website-tab-code"><CodeIcon size={14} className="mr-2" /> Code</TabsTrigger>
+                        </TabsList>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={generate} variant="outline" size="sm" className="btn-ghost-vortex" data-testid="website-regenerate-btn">
+                            <ArrowsClockwise size={14} className="mr-1.5" /> Regenerate
+                          </Button>
+                          <Button onClick={copyCode} variant="outline" size="sm" className="btn-ghost-vortex" data-testid="website-copy-btn">
+                            <ClipboardText size={14} className="mr-1.5" /> Copy
+                          </Button>
+                          <Button onClick={downloadZip} size="sm" className="btn-primary-vortex" data-testid="website-zip-btn">
+                            <DownloadSimple size={14} className="mr-1.5" /> ZIP
+                          </Button>
+                        </div>
+                      </div>
+                      <TabsContent value="preview" className="m-0">
+                        <div className="rounded-xl overflow-hidden border border-white/5 bg-white">
+                          <iframe
+                            ref={iframeRef}
+                            srcDoc={current.html}
+                            title="Generated website preview"
+                            sandbox="allow-scripts"
+                            className="w-full h-[640px] bg-white"
+                            data-testid="website-preview-iframe"
+                          />
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="code" className="m-0">
+                        <pre className="rounded-xl border border-white/5 bg-[#07080d] p-4 overflow-auto max-h-[640px] text-xs leading-relaxed">
+                          <code className="text-cyan-100" data-testid="website-code-block">{current.html}</code>
+                        </pre>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button onClick={downloadHtml} variant="ghost" size="sm" className="text-slate-400 hover:text-white" data-testid="website-html-btn">
+                      <DownloadSimple size={14} className="mr-1.5" /> Download .html
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl p-16 text-center">
+                  <Globe size={48} className="mx-auto text-vortex-cyan opacity-60" />
+                  <div className="mt-6 text-xl font-light">No website yet</div>
+                  <div className="mt-2 text-slate-500 text-sm">Describe what you want on the left and hit Generate.</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* History */}
+            {history.length > 0 && (
+              <div className="mt-8">
+                <div className="text-mono-accent mb-3">Your projects</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {history.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => openHistory(h)}
+                      className="text-left glass rounded-xl p-4 hover:border-white/20 hover:-translate-y-0.5 transition"
+                      data-testid={`website-history-${h.id}`}
+                    >
+                      <div className="text-sm font-medium truncate">{h.description}</div>
+                      <div className="mt-1 text-xs text-slate-500">{new Date(h.created_at).toLocaleString()} · {h.site_type}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

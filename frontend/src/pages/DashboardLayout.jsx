@@ -3,11 +3,13 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import VortexLogo from "@/components/VortexLogo";
 import { Button } from "@/components/ui/button";
-import { ChatCircleDots, House, User, Gear, SignOut, List, X } from "@phosphor-icons/react";
+import { ChatCircleDots, House, User, Gear, SignOut, List, Globe, Image as ImageIcon } from "@phosphor-icons/react";
 
 const NAV = [
   { to: "/dashboard", icon: House, label: "Home", testid: "nav-home" },
   { to: "/dashboard/chat", icon: ChatCircleDots, label: "AI Chat", testid: "nav-chat" },
+  { to: "/dashboard/website", icon: Globe, label: "Website Builder", testid: "nav-website" },
+  { to: "/dashboard/images", icon: ImageIcon, label: "Image Generator", testid: "nav-images" },
   { to: "/dashboard/profile", icon: User, label: "Profile", testid: "nav-profile" },
   { to: "/dashboard/settings", icon: Gear, label: "Settings", testid: "nav-settings" },
 ];

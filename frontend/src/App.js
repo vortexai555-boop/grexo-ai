@@ -11,6 +11,8 @@ import AuthCallback from "@/pages/AuthCallback";
 import DashboardLayout from "@/pages/DashboardLayout";
 import DashboardHome from "@/pages/DashboardHome";
 import ChatPage from "@/pages/ChatPage";
+import WebsitePage from "@/pages/WebsitePage";
+import ImagePage from "@/pages/ImagePage";
 import ProfilePage from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -37,6 +39,8 @@ function AppRouter() {
         <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/dashboard/chat" element={<ChatPage />} />
         <Route path="/dashboard/chat/:cid" element={<ChatPage />} />
+        <Route path="/dashboard/website" element={<WebsitePage />} />
+        <Route path="/dashboard/images" element={<ImagePage />} />
         <Route path="/dashboard/profile" element={<ProfilePage />} />
         <Route path="/dashboard/settings" element={<SettingsPage />} />
       </Route>
