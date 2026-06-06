@@ -568,6 +568,283 @@ async def admin_set_credits(uid: str, credits: int, _=Depends(require_admin)):
     return {"ok": True}
 
 
+# ====================================================================
+# PAYMENTS + SUBSCRIPTIONS + ADMIN PAYMENT SETTINGS (Phase 3)
+# ====================================================================
+import secrets, string
+
+PAYMENT_SETTINGS_ID = "singleton"
+BUSINESS_CREDITS = ENTERPRISE_CREDITS
+DEFAULT_PRICES = {"pro": 29, "business": 99, "currency": "USD"}
+PLAN_TO_CREDITS = {"pro": PRO_CREDITS, "business": BUSINESS_CREDITS, "enterprise": ENTERPRISE_CREDITS}
+ALLOWED_PURCHASE_PLANS = {"pro", "business"}
+
+
+class PaymentSettingsIn(BaseModel):
+    qr_image: Optional[str] = None  # base64 data URL or plain base64
+    qr_mime: Optional[str] = None
+    qr_enabled: Optional[bool] = None
+    pro_price: Optional[float] = None
+    business_price: Optional[float] = None
+    currency: Optional[str] = None
+    instructions: Optional[str] = None
+
+
+class PaymentSubmitIn(BaseModel):
+    plan: str
+    name: str
+    email: EmailStr
+    utr_number: str
+
+
+def _public_settings(doc: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return payment settings safe for public view."""
+    d = doc or {}
+    return {
+        "qr_enabled": d.get("qr_enabled", True),
+        "qr_image": d.get("qr_image"),
+        "qr_mime": d.get("qr_mime", "image/png"),
+        "pro_price": d.get("pro_price", DEFAULT_PRICES["pro"]),
+        "business_price": d.get("business_price", DEFAULT_PRICES["business"]),
+        "currency": d.get("currency", DEFAULT_PRICES["currency"]),
+        "instructions": d.get("instructions", "Scan the QR code with your UPI / banking app and complete the payment. After paying, fill the form below with your full name, email and the UTR / transaction reference."),
+        "updated_at": d.get("updated_at"),
+    }
+
+
+async def _audit(admin_user: Dict[str, Any], action: str, target_id: str = "", details: Optional[Dict[str, Any]] = None):
+    await db.audit_log.insert_one({
+        "id": new_id("aud"),
+        "admin_id": admin_user.get("user_id"),
+        "admin_email": admin_user.get("email"),
+        "action": action,
+        "target_id": target_id,
+        "details": details or {},
+        "ts": now_utc().isoformat(),
+    })
+
+
+def _gen_activation_code(plan: str) -> str:
+    prefix = "VTX-PRO-" if plan == "pro" else "VTX-BUS-"
+    alphabet = string.ascii_uppercase + string.digits
+    return prefix + "".join(secrets.choice(alphabet) for _ in range(6))
+
+
+# --- Public read of payment settings (needed on /payment page) ---
+@api.get("/payment-settings")
+async def get_payment_settings(_user=Depends(get_current_user)):
+    doc = await db.payment_settings.find_one({"id": PAYMENT_SETTINGS_ID}, {"_id": 0})
+    return _public_settings(doc)
+
+
+# --- Admin: update payment settings ---
+@api.put("/admin/payment-settings")
+async def update_payment_settings(body: PaymentSettingsIn, admin=Depends(require_admin)):
+    update: Dict[str, Any] = {"updated_at": now_utc().isoformat()}
+    # Strip "data:image/png;base64," prefix if provided
+    if body.qr_image is not None:
+        img = body.qr_image
+        mime = body.qr_mime
+        if img.startswith("data:"):
+            try:
+                head, b64 = img.split(",", 1)
+                if not mime and ";" in head:
+                    mime = head.split(":", 1)[1].split(";", 1)[0]
+                img = b64
+            except ValueError:
+                pass
+        update["qr_image"] = img
+        update["qr_mime"] = mime or "image/png"
+    if body.qr_enabled is not None: update["qr_enabled"] = bool(body.qr_enabled)
+    if body.pro_price is not None: update["pro_price"] = float(body.pro_price)
+    if body.business_price is not None: update["business_price"] = float(body.business_price)
+    if body.currency is not None: update["currency"] = body.currency
+    if body.instructions is not None: update["instructions"] = body.instructions
+    await db.payment_settings.update_one(
+        {"id": PAYMENT_SETTINGS_ID},
+        {"$set": update, "$setOnInsert": {"id": PAYMENT_SETTINGS_ID, "created_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    await _audit(admin, "update_payment_settings", PAYMENT_SETTINGS_ID, {k: ("<image>" if k == "qr_image" else v) for k, v in update.items()})
+    doc = await db.payment_settings.find_one({"id": PAYMENT_SETTINGS_ID}, {"_id": 0})
+    return _public_settings(doc)
+
+
+@api.delete("/admin/payment-settings/qr")
+async def delete_qr(admin=Depends(require_admin)):
+    await db.payment_settings.update_one(
+        {"id": PAYMENT_SETTINGS_ID},
+        {"$unset": {"qr_image": "", "qr_mime": ""}, "$set": {"updated_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    await _audit(admin, "delete_qr", PAYMENT_SETTINGS_ID)
+    return {"ok": True}
+
+
+# --- User: submit a payment ---
+@api.post("/payments")
+async def submit_payment(body: PaymentSubmitIn, user=Depends(get_current_user)):
+    plan = body.plan.lower()
+    if plan not in ALLOWED_PURCHASE_PLANS:
+        raise HTTPException(status_code=400, detail="Plan must be pro or business")
+    settings = await db.payment_settings.find_one({"id": PAYMENT_SETTINGS_ID}, {"_id": 0})
+    if settings and settings.get("qr_enabled") is False:
+        raise HTTPException(status_code=400, detail="QR payments are currently disabled. Please contact support.")
+    utr = body.utr_number.strip()
+    if not utr or len(utr) < 6:
+        raise HTTPException(status_code=400, detail="Invalid UTR / transaction reference")
+    # Prevent duplicate UTR submissions (globally unique within payments)
+    if await db.payments.find_one({"utr_number": utr}, {"_id": 0}):
+        raise HTTPException(status_code=409, detail="This UTR has already been submitted")
+    rec = {
+        "id": new_id("pay"),
+        "user_id": user["user_id"],
+        "name": body.name.strip()[:120],
+        "email": body.email.lower(),
+        "plan": plan,
+        "utr_number": utr,
+        "status": "pending",
+        "created_at": now_utc().isoformat(),
+        "processed_at": None,
+        "processed_by": None,
+        "activation_code": None,
+        "amount": (settings or {}).get(f"{plan}_price", DEFAULT_PRICES[plan]),
+        "currency": (settings or {}).get("currency", DEFAULT_PRICES["currency"]),
+    }
+    await db.payments.insert_one(rec.copy())
+    await log_activity(user["user_id"], "payment", f"submitted {plan} - {utr}")
+    return {
+        "ok": True,
+        "id": rec["id"],
+        "status": rec["status"],
+        "message": "Payment submitted for verification",
+    }
+
+
+# --- User: list their own payments ---
+@api.get("/payments/me")
+async def my_payments(user=Depends(get_current_user)):
+    docs = await db.payments.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return docs
+
+
+# --- User: get their active subscription ---
+@api.get("/subscriptions/me")
+async def my_subscription(user=Depends(get_current_user)):
+    docs = await db.subscriptions.find({"user_id": user["user_id"]}, {"_id": 0}).sort("start_date", -1).limit(20).to_list(20)
+    active = None
+    now_iso = now_utc().isoformat()
+    for d in docs:
+        if d.get("status") == "active" and (not d.get("end_date") or d["end_date"] >= now_iso):
+            active = d
+            break
+    return {"active": active, "history": docs}
+
+
+# --- Admin: list payments ---
+@api.get("/admin/payments")
+async def admin_list_payments(status: Optional[str] = None, _admin=Depends(require_admin)):
+    q: Dict[str, Any] = {}
+    if status in ("pending", "approved", "rejected"):
+        q["status"] = status
+    docs = await db.payments.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+    return docs
+
+
+# --- Admin: approve payment ---
+@api.post("/admin/payments/{pid}/approve")
+async def admin_approve_payment(pid: str, admin=Depends(require_admin)):
+    pay = await db.payments.find_one({"id": pid}, {"_id": 0})
+    if not pay:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if pay["status"] == "approved":
+        raise HTTPException(status_code=400, detail="Payment already approved")
+
+    plan = pay["plan"]
+    if plan not in ALLOWED_PURCHASE_PLANS:
+        raise HTTPException(status_code=400, detail="Unsupported plan on this payment")
+
+    # Generate a globally unique activation code
+    code = None
+    for _ in range(8):
+        candidate = _gen_activation_code(plan)
+        exists = await db.subscriptions.find_one({"activation_code": candidate}, {"_id": 0})
+        if not exists:
+            code = candidate
+            break
+    if not code:
+        raise HTTPException(status_code=500, detail="Could not generate unique activation code")
+
+    start = now_utc()
+    end = start + timedelta(days=30)
+    sub = {
+        "id": new_id("sub"),
+        "user_id": pay["user_id"],
+        "plan": plan,
+        "activation_code": code,
+        "status": "active",
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "payment_id": pid,
+        "created_at": start.isoformat(),
+    }
+    # Deactivate any older active subscriptions for this user
+    await db.subscriptions.update_many(
+        {"user_id": pay["user_id"], "status": "active"},
+        {"$set": {"status": "inactive", "deactivated_at": start.isoformat(), "deactivated_reason": "replaced"}},
+    )
+    await db.subscriptions.insert_one(sub.copy())
+
+    # Apply plan + credit grant to the user
+    credits_to_grant = PLAN_TO_CREDITS.get(plan, FREE_CREDITS)
+    await db.users.update_one(
+        {"user_id": pay["user_id"]},
+        {"$set": {"plan": plan, "credits": credits_to_grant, "active_activation_code": code}},
+    )
+
+    await db.payments.update_one(
+        {"id": pid},
+        {"$set": {
+            "status": "approved",
+            "processed_at": start.isoformat(),
+            "processed_by": admin["user_id"],
+            "activation_code": code,
+        }},
+    )
+    await _audit(admin, "approve_payment", pid, {"plan": plan, "code": code, "user_id": pay["user_id"]})
+    return {"ok": True, "activation_code": code, "subscription": sub}
+
+
+# --- Admin: reject payment ---
+@api.post("/admin/payments/{pid}/reject")
+async def admin_reject_payment(pid: str, admin=Depends(require_admin)):
+    pay = await db.payments.find_one({"id": pid}, {"_id": 0})
+    if not pay:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if pay["status"] == "approved":
+        raise HTTPException(status_code=400, detail="Cannot reject an already approved payment")
+    await db.payments.update_one(
+        {"id": pid},
+        {"$set": {"status": "rejected", "processed_at": now_utc().isoformat(), "processed_by": admin["user_id"]}},
+    )
+    await _audit(admin, "reject_payment", pid, {"plan": pay.get("plan"), "user_id": pay.get("user_id")})
+    return {"ok": True}
+
+
+# --- Admin: list subscriptions ---
+@api.get("/admin/subscriptions")
+async def admin_list_subscriptions(_admin=Depends(require_admin)):
+    docs = await db.subscriptions.find({}, {"_id": 0}).sort("start_date", -1).limit(500).to_list(500)
+    return docs
+
+
+# --- Admin: audit log ---
+@api.get("/admin/audit")
+async def admin_audit(_admin=Depends(require_admin)):
+    docs = await db.audit_log.find({}, {"_id": 0}).sort("ts", -1).limit(200).to_list(200)
+    return docs
+
+
 @api.get("/")
 async def root(): return {"app": "VORTEX AI", "ok": True}
 
@@ -587,6 +864,12 @@ async def seed_admin():
         # Ensure admin has admin role
         if existing.get("role") != "admin":
             await db.users.update_one({"email": ADMIN_EMAIL.lower()}, {"$set": {"role": "admin"}})
+    # Indexes for payment/subscription system
+    try:
+        await db.payments.create_index("utr_number", unique=True)
+        await db.subscriptions.create_index("activation_code", unique=True)
+    except Exception as e:
+        logger.warning("Index creation issue: %s", e)
 
 @app.on_event("shutdown")
 async def shutdown_db():

@@ -3,13 +3,14 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import VortexLogo from "@/components/VortexLogo";
 import { Button } from "@/components/ui/button";
-import { ChatCircleDots, House, User, Gear, SignOut, List, Globe, Image as ImageIcon } from "@phosphor-icons/react";
+import { ChatCircleDots, House, User, Gear, SignOut, List, Globe, Image as ImageIcon, CreditCard, ShieldStar } from "@phosphor-icons/react";
 
 const NAV = [
   { to: "/dashboard", icon: House, label: "Home", testid: "nav-home" },
   { to: "/dashboard/chat", icon: ChatCircleDots, label: "AI Chat", testid: "nav-chat" },
   { to: "/dashboard/website", icon: Globe, label: "Website Builder", testid: "nav-website" },
   { to: "/dashboard/images", icon: ImageIcon, label: "Image Generator", testid: "nav-images" },
+  { to: "/dashboard/billing", icon: CreditCard, label: "Billing", testid: "nav-billing" },
   { to: "/dashboard/profile", icon: User, label: "Profile", testid: "nav-profile" },
   { to: "/dashboard/settings", icon: Gear, label: "Settings", testid: "nav-settings" },
 ];
@@ -49,6 +50,25 @@ export default function DashboardLayout() {
             {item.label}
           </NavLink>
         ))}
+        {user?.role === "admin" && (
+          <>
+            <div className="px-3 pt-4 pb-1 text-mono-accent">Admin</div>
+            <NavLink
+              to="/dashboard/admin"
+              onClick={() => setOpen(false)}
+              data-testid="nav-admin"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                  isActive
+                    ? "bg-vortex-cyan/10 text-vortex-cyan border border-vortex-cyan/30"
+                    : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                }`
+              }
+            >
+              <ShieldStar size={18} weight="duotone" /> Admin Panel
+            </NavLink>
+          </>
+        )}
       </nav>
       <div className="p-4 border-t border-white/5">
         <div className="glass rounded-xl p-4 mb-3">
