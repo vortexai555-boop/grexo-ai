@@ -43,14 +43,21 @@ export default function ChatPage() {
       navigate("/dashboard/chat");
     }
   };
+  
+ useEffect(() => {
+  loadConversations();
+}, []);
 
-  useEffect(() => { loadConversations(); }, []);
-  [loadconversation]);
-  useEffect(() => { loadConversation(cid); }, [cid,
-  loadconversations]);
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [current?.messages, sending]);
+useEffect(() => {
+  loadConversation(cid);
+}, [cid]);
 
+useEffect(() => {
+  if (scrollRef.current) {
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }
+}, [current?.messages, sending]);
+  
   const send = async (e) => {
     e?.preventDefault();
     const text = input.trim();
