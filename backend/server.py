@@ -351,9 +351,10 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
     transcript = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in history[:-1]])
     prompt = (transcript + "\n\nUSER: " + body.message) if transcript else body.message
     try:
-        reply = await llm_complete(system, prompt, session_id=cid)
-    except Exception as e:
-    logger.exception("image gen failed: %s", e)
+       try:
+    reply = await llm_complete(system, prompt, session_id=cid)
+except Exception as e:
+    logger.exception("chat failed: %s", e)
     raise HTTPException(status_code=500, detail=str(e))
     ai_msg = {"role": "assistant", "content": reply, "ts": now_utc().isoformat()}
     await db.conversations.update_one({"id": cid, "user_id": user["user_id"]}, {"$push": {"messages": ai_msg}, "$set": {"updated_at": now_utc().isoformat()}})
