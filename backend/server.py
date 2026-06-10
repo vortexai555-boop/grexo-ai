@@ -173,12 +173,29 @@ def detect_image_mime(b64: str) -> str:
 
 
 async def llm_complete(system: str, user_text: str, session_id: Optional[str] = None) -> str:
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    headers = {
+        "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+        "Content-Type": "application/json"
+    }
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    payload = {
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_text}
+        ]
+    }
 
-    response = model.generate_content(
-        f"{system}\n\n{user_text}"
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+
+    data = response.json()
+    return data["choices"][0]["message"]["content"]
     )
 
     return response.text
