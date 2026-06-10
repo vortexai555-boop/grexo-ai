@@ -195,9 +195,6 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
 
     data = response.json()
     return data["choices"][0]["message"]["content"]
-    )
-
-    return response.text
 
 async def gen_image(prompt: str) -> Optional[str]:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
