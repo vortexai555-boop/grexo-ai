@@ -365,22 +365,27 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
 ASPECT_HINTS = {"1:1": "square 1:1", "16:9": "wide cinematic 16:9", "9:16": "vertical portrait 9:16", "4:3": "classic 4:3"}
 
 @api.post("/images/generate")
-async def images_generate(body: ImageGenIn, user=Depends(get_current_user)):
-    n = max(1, min(body.count, 4))
-    await require_credits(user, n * 2)
-    hint = ASPECT_HINTS.get(body.aspect_ratio, "square 1:1")
-    full_prompt = f"{body.prompt}. Style: ultra detailed, photorealistic, professional, {hint} aspect ratio. High resolution, cinematic lighting."
-    results = await asyncio.gather(*[gen_image(full_prompt) for _ in range(n)])
-    items = []
-    for data in results:
-        if not data: continue
-        rec = {"id": new_id("img"), "user_id": user["user_id"], "prompt": body.prompt, "aspect_ratio": body.aspect_ratio, "data": data, "mime": detect_image_mime(data), "created_at": now_utc().isoformat()}
-        await db.images.insert_one(rec.copy())
-        items.append({k: v for k, v in rec.items() if k != "user_id"})
-    await deduct_credits(user["user_id"], n * 2)
-    await log_activity(user["user_id"], "image", body.prompt[:120])
-    if not items: raise HTTPException(status_code=500, detail="Image generation failed")
-    return {"images": items}
+async def gen_image(prompt: str) -> Optional[str]:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=new_id("img"),
+            system_message="You are a world class image generator."
+        ).with_model("gemini", IMAGE_MODEL).with_params(modalities=["image", "text"])
+
+        _text, images = await chat.send_message_multimodal_response(
+            UserMessage(text=prompt)
+        )
+
+        if images and len(images) > 0:
+            return images[0]["data"]
+
+    except Exception as e:
+        logger.exception("image gen failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return None
 
 @api.get("/images")
 async def list_images(user=Depends(get_current_user)):
