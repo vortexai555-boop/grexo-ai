@@ -182,7 +182,7 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
         "Content-Type": "application/json"
     }
 
-   search_results = web_search(user_text)
+    search_results = web_search(user_text)
     payload = {
         "model": "openai/gpt-4o-mini",
         "messages": [
