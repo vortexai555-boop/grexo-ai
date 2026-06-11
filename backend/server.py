@@ -399,7 +399,6 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
             "$set": {"updated_at": now_utc().isoformat()}
         }
     )
-    )
 
     return {
         "conversation_id": cid,
