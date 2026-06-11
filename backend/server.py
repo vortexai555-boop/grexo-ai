@@ -359,14 +359,13 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
         "ts": now_utc().isoformat()
     }
 
-       await db.conversations.update_one(
+    await db.conversations.update_one(
         {"id": cid, "user_id": user["user_id"]},
         {
             "$push": {"messages": user_msg},
             "$set": {"updated_at": now_utc().isoformat()}
         }
     )
-
     conv = await db.conversations.find_one(
         {"id": cid, "user_id": user["user_id"]},
         {"_id": 0}
