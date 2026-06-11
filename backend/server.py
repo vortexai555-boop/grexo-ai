@@ -377,22 +377,22 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
     transcript = "\n".join(
         [f"{m['role'].upper()}: {m['content']}" for m in history[:-1]]
     )
+   import re
 
-    prompt = (
-        transcript + "\n\nUSER: " + body.message
-    ) if transcript else body.message
+prompt = (
+    transcript + "\n\nUSER: " + body.message
+) if transcript else body.message
 
-   if body.message.replace(" ", "").replace("*", "").isdigit():
-    reply = str(eval(body.message))
+if re.fullmatch(r"[0-9+\-*/(). ]+", body.message):
+    try:
+        reply = str(eval(body.message))
+    except:
+        reply = "Invalid calculation"
 else:
     try:
         reply = await llm_complete(system, prompt, session_id=cid)
     except Exception as e:
-        logger.exception("chat failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-    ai_msg = {
-        "role": "assistant",
-        "content": reply,
+        reply = f"Error: {str(e)}"
         "ts": now_utc().isoformat()
     }
 
