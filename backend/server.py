@@ -359,7 +359,7 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
         "ts": now_utc().isoformat()
     }
 
-    await db.conversations.update_one(
+       await db.conversations.update_one(
         {"id": cid, "user_id": user["user_id"]},
         {
             "$push": {"messages": user_msg},
@@ -378,7 +378,7 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
         [f"{m['role'].upper()}: {m['content']}" for m in history[:-1]]
     )
 
-     prompt = (
+    prompt = (
         transcript + "\n\nUSER: " + body.message
     ) if transcript else body.message
 
@@ -396,9 +396,10 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
     await db.conversations.update_one(
         {"id": cid, "user_id": user["user_id"]},
         {
-            "$push": {"messages": ai_msg},
+            "$push": {"messages": assistant_msg},
             "$set": {"updated_at": now_utc().isoformat()}
         }
+    )
     )
 
     return {
