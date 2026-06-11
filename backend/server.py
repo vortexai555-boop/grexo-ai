@@ -5,6 +5,7 @@ import uuid
 import logging
 import asyncio
 from pathlib import Path
+from duckduckgo_search import DDGS
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
@@ -202,8 +203,21 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
             timeout=20
         )
 
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+   data = response.json()
+return data["choices"][0]["message"]["content"]
+
+
+from duckduckgo_search import DDGS
+
+async def web_search(query: str):
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=5))
+        return results
+    except Exception as e:
+        logger.exception("search failed: %s", e)
+        return []
+
 
 async def gen_image(prompt: str) -> Optional[str]:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
