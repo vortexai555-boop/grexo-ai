@@ -438,7 +438,7 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
             for r in search_results[:5]
         ])
 
-prompt = f"""
+        prompt = f"""
 You have access to fresh web search results.
 
 WEB RESULTS:
