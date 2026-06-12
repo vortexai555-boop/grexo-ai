@@ -431,21 +431,23 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
     ) if transcript else body.message
 
     # Web Search
+    search_results = []
     try:
         search_results = await web_search(body.message)
-        print("SEARCH RESULTS:", search_results)
-        print("RESULT COUNT:", len(search_results))
+        logger.info("Search results count: %d", len(search_results))
     except Exception as e:
-        print("SEARCH ERROR:", str(e))
         logger.exception("Search failed: %s", e)
-       
+        search_results = []
+
+    if search_results:
         search_text = "\n".join([
             f"- {r.get('title', '')}: {r.get('body', '')}"
             for r in search_results[:5]
         ])
 
-        prompt = f"""
-You have access to fresh web search results.
+        prompt = f"""{transcript}
+
+You have access to fresh web search results for the user's latest question.
 
 WEB RESULTS:
 {search_text}
@@ -453,19 +455,10 @@ WEB RESULTS:
 USER QUESTION:
 {body.message}
 
-Answer using the web results when relevant.
-Do not say you lack real-time information.
+Answer using the web results above when relevant. Do not say you lack real-time information or internet access; the results above ARE your real-time information.
 """
 
-    except Exception as e:
-        logger.exception("Search failed: %s", e)
-
-    try:
-        print("SEARCH RESULTS:", search_results)
-    except:
-        print("SEARCH RESULTS: None")
-
-    print("PROMPT:", prompt[:2000])
+    logger.debug("Prompt sent to LLM: %s", prompt[:2000])
 
     try:
         reply = await llm_complete(
@@ -499,27 +492,37 @@ Do not say you lack real-time information.
 ASPECT_HINTS = {"1:1": "square 1:1", "16:9": "wide cinematic 16:9", "9:16": "vertical portrait 9:16", "4:3": "classic 4:3"}
 
 @api.post("/images/generate")
-async def generate_image_api(prompt: str) -> Optional[str]:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=new_id("img"),
-            system_message="You are a world class image generator."
-        ).with_model("gemini", IMAGE_MODEL).with_params(modalities=["image", "text"])
+async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
+    count = max(1, min(body.count, 4))
+    await require_credits(user, 2 * count)
 
-        _text, images = await chat.send_message_multimodal_response(
-            UserMessage(text=prompt)
-        )
+    aspect_hint = ASPECT_HINTS.get(body.aspect_ratio, "square 1:1")
+    full_prompt = f"{body.prompt}, {aspect_hint}"
 
-        if images and len(images) > 0:
-            return images[0]["data"]
+    results = await asyncio.gather(*[gen_image(full_prompt) for _ in range(count)])
+    images = []
+    for data in results:
+        if not data:
+            continue
+        mime = detect_image_mime(data)
+        rec = {
+            "id": new_id("img"),
+            "user_id": user["user_id"],
+            "prompt": body.prompt,
+            "aspect_ratio": body.aspect_ratio,
+            "data": data,
+            "mime": mime,
+            "created_at": now_utc().isoformat(),
+        }
+        await db.images.insert_one(rec)
+        images.append({k: v for k, v in rec.items() if k != "user_id" and k != "_id"})
 
-    except Exception as e:
-        logger.exception("image gen failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+    if not images:
+        raise HTTPException(status_code=500, detail="Image generation failed. Please try again.")
 
-    return None
+    await deduct_credits(user["user_id"], 2 * len(images))
+    return {"images": images}
+
 
 @api.get("/images")
 async def list_images(user=Depends(get_current_user)):
