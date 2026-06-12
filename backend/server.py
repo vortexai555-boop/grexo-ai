@@ -455,14 +455,14 @@ Do not say you lack real-time information.
     except Exception as e:
         logger.exception("Search failed: %s", e)
 
-    try:
+       try:
         print("SEARCH RESULTS:", search_results)
     except:
         print("SEARCH RESULTS: None")
 
     print("PROMPT:", prompt[:2000])
-    
-try:
+
+    try:
         reply = await llm_complete(
             system,
             prompt,
@@ -470,6 +470,7 @@ try:
         )
     except Exception as e:
         reply = f"Error: {str(e)}"
+
     assistant_msg = {
         "role": "assistant",
         "content": reply,
