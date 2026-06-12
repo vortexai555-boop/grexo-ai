@@ -415,31 +415,30 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
         }
     )
 
-    conv = await db.conversations.find_one(
+      conv = await db.conversations.find_one(
         {"id": cid, "user_id": user["user_id"]},
         {"_id": 0}
     )
 
-   history = conv.get("messages", [])[-20:]
+    history = conv.get("messages", [])[-20:]
 
-transcript = "\n".join(
-    [f"{m['role'].upper()}: {m['content']}" for m in history[:-1]]
-)
+    transcript = "\n".join(
+        [f"{m['role'].upper()}: {m['content']}" for m in history[:-1]]
+    )
 
-prompt = (
-    transcript + "\n\nUSER: " + body.message
-) if transcript else body.message
+    prompt = (
+        transcript + "\n\nUSER: " + body.message
+    ) if transcript else body.message
 
-# Web Search
-try:
-    search_results = await web_search(body.message)
+    # Web Search
+    try:
+        search_results = await web_search(body.message)
+        search_text = "\n".join([
+            f"- {r.get('title', '')}: {r.get('body', '')}"
+            for r in search_results[:5]
+        ])
 
-    search_text = "\n".join([
-        f"- {r.get('title', '')}: {r.get('body', '')}"
-        for r in search_results[:5]
-    ])
-
-    prompt = f"""
+        prompt = f"""
 You have access to fresh web search results.
 
 WEB RESULTS:
@@ -447,6 +446,7 @@ WEB RESULTS:
 
 USER QUESTION:
 {body.message}
+"""
 
 Answer using the web results when relevant.
 Do not say you lack real-time information.
