@@ -247,7 +247,7 @@ async def gen_image(prompt: str) -> Optional[str]:
         )
 
         model = genai.GenerativeModel(
-            "gemini-2.0-flash-preview-image-generation"
+            "gemini-2.5-flash-image"
         )
 
         response = model.generate_content(prompt)
