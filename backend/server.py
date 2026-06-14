@@ -600,9 +600,6 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
 
 
 @api.get("/images")
-
-import base64
-
 async def gen_image(prompt: str):
     try:
         model = genai.GenerativeModel(
