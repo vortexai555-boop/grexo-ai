@@ -456,7 +456,7 @@ async def chat_send(body: ChatMessageIn, user=Depends(get_current_user)):
         logger.exception("Search failed: %s", e)
         search_results = []
 
-   if search_results:
+if search_results:
     search_text = "\n".join([
         f"- {r.get('title', '')}: {r.get('body', '')}"
         for r in search_results[:5]
