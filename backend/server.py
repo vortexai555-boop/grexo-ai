@@ -476,14 +476,24 @@ Answer using the web results above when relevant. Do not say you lack real-time 
 
     logger.debug("Prompt sent to LLM: %s", prompt[:2000])
 
-    try:
-        reply = await llm_complete(
-            system,
-            prompt,
-            session_id=cid
-        )
-    except Exception as e:
-        reply = f"Error: {str(e)}"
+  try:
+      model = genai.GenerativeModel("gemini-1.5-flash")
+
+      full_prompt = f"""
+ SYSTEM:
+ {system}
+
+ USER:
+ {prompt}
+ """
+
+      response = model.generate_content(full_prompt)
+
+      reply = response.text
+
+ except Exception as e:
+     logger.exception("Gemini error: %s", e)
+     reply = f"Error: {str(e)}"
 
     assistant_msg = {
         "role": "assistant",
