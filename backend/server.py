@@ -526,12 +526,25 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
     aspect_hint = ASPECT_HINTS.get(body.aspect_ratio, "square 1:1")
     full_prompt = f"{body.prompt}, {aspect_hint}"
 
-    results = await asyncio.gather(*[gen_image(full_prompt) for _ in range(count)])
+    try:
+        results = await asyncio.gather(
+            *[gen_image(full_prompt) for _ in range(count)]
+        )
+    except Exception as e:
+        logger.exception("Image generation error: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Image generation error: {str(e)}"
+        )
+
     images = []
+
     for data in results:
         if not data:
             continue
+
         mime = detect_image_mime(data)
+
         rec = {
             "id": new_id("img"),
             "user_id": user["user_id"],
@@ -541,24 +554,29 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
             "mime": mime,
             "created_at": now_utc().isoformat(),
         }
+
         await db.images.insert_one(rec)
-        images.append({k: v for k, v in rec.items() if k != "user_id" and k != "_id"})
+
+        images.append({
+            k: v
+            for k, v in rec.items()
+            if k not in ("user_id", "_id")
+        })
 
     if not images:
-        raise HTTPException(status_code=500, detail="Image generation failed. Please try again.")
+        raise HTTPException(
+            status_code=500,
+            detail="Image generation failed. Please try again."
+        )
 
-    await deduct_credits(user["user_id"], 2 * len(images))
-    return {"images": images}
-  try:
-      results = await asyncio.gather(
-          *[gen_image(full_prompt) for _ in range(count)]
-      )
-  except Exception as e:
-      logger.exception("Image generation error: %s", e)
-      raise HTTPException(
-          status_code=500,
-          detail=str(e)
-      )
+    await deduct_credits(
+        user["user_id"],
+        2 * len(images)
+    )
+
+    return {
+        "images": images
+    }
 
 
 @api.get("/images")
