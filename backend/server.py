@@ -228,12 +228,12 @@ async def web_search(query: str):
         return []
 
 
-from google import genai
+import google.generativeai as genai
 import base64
 import os
 from typing import Optional
 
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 import base64
 import os
@@ -608,13 +608,45 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
 
 
 @api.get("/images")
-async def list_images(user=Depends(get_current_user)):
-    docs = await db.images.find({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0}).sort("created_at", -1).limit(60).to_list(60)
-    for d in docs:
-        if not d.get("mime"):
-            d["mime"] = detect_image_mime(d.get("data", ""))
-    return docs
+from google import genai
+from google.genai import types
+import base64
+import os
+from typing import Optional
 
+image_client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
+
+async def gen_image(prompt: str) -> Optional[str]:
+    try:
+        logger.info("Generating image with Imagen 4 Fast: %s", prompt)
+
+        response = image_client.models.generate_images(
+            model="imagen-4.0-fast-generate-001",
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1
+            )
+        )
+
+        if (
+            hasattr(response, "generated_images")
+            and response.generated_images
+            and len(response.generated_images) > 0
+        ):
+            image_bytes = response.generated_images[0].image.image_bytes
+
+            return base64.b64encode(
+                image_bytes
+            ).decode("utf-8")
+
+        logger.warning("No image returned from Imagen")
+        return None
+
+    except Exception as e:
+        logger.exception("Imagen generation failed: %s", e)
+        return None
 
 @api.post("/logos/generate")
 async def logos_generate(body: LogoGenIn, user=Depends(get_current_user)):
