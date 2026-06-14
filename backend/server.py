@@ -224,27 +224,49 @@ async def web_search(query: str):
         return []
 
 
-async def gen_image(prompt: str) -> Optional[str]:
- import google.generativeai as genai
+import google.generativeai as genai
 import base64
 import os
+from typing import Optional
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-async def gen_image(prompt: str):
+async def gen_image(prompt: str) -> Optional[str]:
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-preview-image-generation")
+        logger.info("Generating image with prompt: %s", prompt)
+        logger.info(
+            "Gemini key loaded: %s",
+            bool(os.getenv("GEMINI_API_KEY"))
+        )
+
+        model = genai.GenerativeModel(
+            "gemini-2.0-flash-preview-image-generation"
+        )
 
         response = model.generate_content(prompt)
 
-        for part in response.parts:
-            if hasattr(part, "inline_data") and part.inline_data:
-                return base64.b64encode(part.inline_data.data).decode("utf-8")
+        logger.info("Gemini response received")
 
+        # Debug entire response
+        logger.info("Response: %s", response)
+
+        if hasattr(response, "parts"):
+            for part in response.parts:
+                if (
+                    hasattr(part, "inline_data")
+                    and part.inline_data
+                    and part.inline_data.data
+                ):
+                    logger.info("Image data found")
+                    return base64.b64encode(
+                        part.inline_data.data
+                    ).decode("utf-8")
+
+        logger.warning("No image data found in Gemini response")
         return None
 
     except Exception as e:
-        logger.exception("image gen failed: %s", e)
+        logger.exception("Image generation failed: %s", e)
         return None
 
 # ---- Auth: JWT ----
