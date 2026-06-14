@@ -17,11 +17,6 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, EmailStr
-import os
-from google import genai
-genai.configure(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
 import google.generativeai as genai
 import os
 
