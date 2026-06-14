@@ -8,7 +8,6 @@ from pathlib import Path
 from duckduckgo_search import DDGS
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
-
 import jwt
 import httpx
 import bcrypt
@@ -16,13 +15,12 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Respons
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
-image_client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
 from pydantic import BaseModel, Field, EmailStr
 from google import genai
 from google.genai import types
-
+image_client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
