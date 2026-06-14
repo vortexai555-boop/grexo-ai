@@ -233,9 +233,15 @@ import base64
 import os
 from typing import Optional
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+from google import genai
+from google.genai import types
+import base64
+import os
+from typing import Optional
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
 
 async def gen_image(prompt: str) -> Optional[str]:
     try:
@@ -246,7 +252,7 @@ async def gen_image(prompt: str) -> Optional[str]:
             prompt=prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1
-            ),
+            )
         )
 
         if (
