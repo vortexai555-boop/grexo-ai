@@ -477,42 +477,41 @@ Answer using the web results above when relevant. Do not say you lack real-time 
     logger.debug("Prompt sent to LLM: %s", prompt[:2000])
 
   try:
-      model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
-      full_prompt = f"""
- SYSTEM:
- {system}
+    full_prompt = f"""
+SYSTEM:
+{system}
 
- USER:
- {prompt}
- """
+USER:
+{prompt}
+"""
 
-      response = model.generate_content(full_prompt)
+    response = model.generate_content(full_prompt)
+    reply = response.text
 
-      reply = response.text
+except Exception as e:
+    logger.exception("Gemini error: %s", e)
+    reply = f"Error: {str(e)}"
 
- except Exception as e:
-     logger.exception("Gemini error: %s", e)
-     reply = f"Error: {str(e)}"
+assistant_msg = {
+    "role": "assistant",
+    "content": reply,
+    "ts": now_utc().isoformat()
+}
 
-    assistant_msg = {
-        "role": "assistant",
-        "content": reply,
-        "ts": now_utc().isoformat()
+await db.conversations.update_one(
+    {"id": cid, "user_id": user["user_id"]},
+    {
+        "$push": {"messages": assistant_msg},
+        "$set": {"updated_at": now_utc().isoformat()}
     }
+)
 
-    await db.conversations.update_one(
-        {"id": cid, "user_id": user["user_id"]},
-        {
-            "$push": {"messages": assistant_msg},
-            "$set": {"updated_at": now_utc().isoformat()}
-        }
-    )
-
-    return {
-        "conversation_id": cid,
-        "reply": reply
-    }
+return {
+    "conversation_id": cid,
+    "reply": reply
+}
 
 
 ASPECT_HINTS = {"1:1": "square 1:1", "16:9": "wide cinematic 16:9", "9:16": "vertical portrait 9:16", "4:3": "classic 4:3"}
