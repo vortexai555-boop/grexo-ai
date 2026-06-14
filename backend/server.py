@@ -4,6 +4,7 @@ import os
 import uuid
 import logging
 import asyncio
+from openai import OpenAI
 from pathlib import Path
 from duckduckgo_search import DDGS
 from datetime import datetime, timezone, timedelta
