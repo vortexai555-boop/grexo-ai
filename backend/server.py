@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, EmailStr
 from google import genai
 from google.genai import types
 import base64
-image_client = genai.Client(
+ai_client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
 
@@ -216,32 +216,20 @@ from duckduckgo_search import DDGS
 
 async def web_search(query: str):
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=5))
-        return results
+        def _search():
+            from duckduckgo_search import DDGS
+            with DDGS() as ddgs:
+                return list(ddgs.text(query, max_results=5))
+        return await asyncio.to_thread(_search)
     except Exception as e:
         logger.exception("search failed: %s", e)
         return []
 
 
-from google import genai
-from google.genai import types
-import base64
-import os
-from typing import Optional
-from google import genai
-from google.genai import types
-
-import base64
-import os
-from typing import Optional
-
-import base64
-
 async def gen_image(prompt: str):
     try:
-        response = image_client.models.generate_images(
-            model="imagen-4.0-fast-generate-001",
+        response = ai_client.models.generate_images(
+            model="imagen-3.0-generate-001",
             prompt=prompt
         )
 
@@ -503,11 +491,13 @@ USER:
 """
 
         response = ai_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash",
             contents=full_prompt
         )
 
         reply = response.text
+        if not reply:
+            reply = "No response from model."
 
     except Exception as e:
         logger.exception("Gemini error: %s", e)
@@ -601,25 +591,8 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
 
 
 @api.get("/images")
-async def gen_image(prompt: str):
-    try:
-        response = image_client.models.generate_images(
-            model="imagen-4.0-fast-generate-001",
-            prompt=prompt
-        )
-
-        if response.generated_images:
-            image_bytes = response.generated_images[0].image.image_bytes
-            return base64.b64encode(image_bytes).decode("utf-8")
-
-        return None
-
-    except Exception as e:
-        logger.exception(
-            "Image generation failed: %s",
-            e
-        )
-        return None
+async def list_images(user=Depends(get_current_user)):
+    return await db.images.find({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0}).sort("created_at", -1).limit(40).to_list(40)
 
 @api.post("/logos/generate")
 async def logos_generate(body: LogoGenIn, user=Depends(get_current_user)):
