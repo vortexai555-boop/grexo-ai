@@ -19,12 +19,14 @@ from pydantic import BaseModel, Field, EmailStr
 from google import genai
 from google.genai import types
 import base64
-ai_client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+
+import os
+ai_client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY", "")
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -226,22 +228,41 @@ async def web_search(query: str):
         return []
 
 
-async def gen_image(prompt: str):
+async def gen_image(prompt: str, aspect_ratio: str = "1:1"):
     try:
-        response = ai_client.models.generate_images(
-            model="imagen-3.0-generate-001",
-            prompt=prompt
+        if aspect_ratio == "1:1":
+            ar_config = "1:1"
+        elif aspect_ratio == "16:9":
+            ar_config = "16:9"
+        elif aspect_ratio == "9:16":
+            ar_config = "9:16"
+        elif aspect_ratio == "4:3":
+            ar_config = "4:3"
+        elif aspect_ratio == "3:4":
+            ar_config = "3:4"
+        else:
+            ar_config = "1:1"
+
+        response = await ai_client.aio.models.generate_content(
+            model="gemini-2.5-flash-image",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                image_config=types.ImageConfig(
+                    aspect_ratio=ar_config
+                )
+            )
         )
 
-        if response.generated_images:
-            image_bytes = response.generated_images[0].image.image_bytes
-            return base64.b64encode(image_bytes).decode("utf-8")
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.data:
+                    return base64.b64encode(part.inline_data.data).decode("utf-8")
 
         return None
 
     except Exception as e:
         logger.exception("Image generation failed: %s", e)
-        return None
+        raise e
 
 # ---- Auth: JWT ----
 @api.post("/auth/signup")
@@ -490,7 +511,7 @@ USER:
 {prompt}
 """
 
-        response = ai_client.models.generate_content(
+        response = await ai_client.aio.models.generate_content(
             model="gemini-3.5-flash",
             contents=full_prompt
         )
@@ -537,7 +558,7 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
 
     try:
         results = await asyncio.gather(
-            *[gen_image(full_prompt) for _ in range(count)]
+            *[gen_image(body.prompt, body.aspect_ratio) for _ in range(count)]
         )
         logger.info("Results count: %d", len(results))
         logger.info("Valid images count: %d", len([r for r in results if r])) 
@@ -592,10 +613,7 @@ async def generate_image_api(body: ImageGenIn, user=Depends(get_current_user)):
 
 @api.get("/images")
 async def list_images(user=Depends(get_current_user)):
-    return await db.images.find(
-        {"user_id": user["user_id"]}, 
-        {"_id": 0, "user_id": 0}
-    ).sort("created_at", -1).limit(40).to_list(40)
+    return await db.images.find({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0}).sort("created_at", -1).limit(40).to_list(40)
 
 @api.post("/logos/generate")
 async def logos_generate(body: LogoGenIn, user=Depends(get_current_user)):
