@@ -21,6 +21,8 @@ from google.genai import types
 import httpx
 import urllib.parse
 import base64
+from pydantic import BaseModel
+from typing import Optional
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
