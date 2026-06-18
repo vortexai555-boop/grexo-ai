@@ -3,7 +3,6 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import VortexLogo from "@/components/VortexLogo";
 import { Button } from "@/components/ui/button";
-import { ChatCircleDots, House, User, Gear, SignOut, List, Globe, Image as ImageIcon, CreditCard, ShieldStar } from "@phosphor-icons/react";
 import { ChatCircleDots, House, User, Gear, SignOut, List, Globe, Image as ImageIcon, CreditCard, ShieldStar, MagicWand } from "@phosphor-icons/react";
 
 const NAV = [
@@ -11,6 +10,7 @@ const NAV = [
   { to: "/dashboard/chat", icon: ChatCircleDots, label: "AI Chat", testid: "nav-chat" },
   { to: "/dashboard/website", icon: Globe, label: "Website Builder", testid: "nav-website" },
   { to: "/dashboard/images", icon: ImageIcon, label: "Image Generator", testid: "nav-images" },
+  { to: "/dashboard/productivity", icon: MagicWand, label: "Productivity", testid: "nav-productivity" },
   { to: "/dashboard/billing", icon: CreditCard, label: "Billing", testid: "nav-billing" },
   { to: "/dashboard/profile", icon: User, label: "Profile", testid: "nav-profile" },
   { to: "/dashboard/settings", icon: Gear, label: "Settings", testid: "nav-settings" },
