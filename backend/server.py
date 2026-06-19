@@ -72,6 +72,7 @@ class ChatMessageIn(BaseModel):
     conversation_id: Optional[str] = None
     message: str
     tool: str = "chat"
+    web_search: bool = False
 
 
 class CalcIn(BaseModel):
@@ -484,16 +485,13 @@ async def chat_send(
     # Web Search
     search_results = []
 
-    try:
-        search_results = await web_search(body.message)
-        logger.info(
-            "Search results count: %d",
-            len(search_results)
-        )
-
-    except Exception as e:
-        logger.exception("Search failed: %s", e)
-        search_results = []
+    if body.web_search:
+        try:
+            search_results = await web_search(body.message)
+            logger.info("Search results count: %d", len(search_results))
+        except Exception as e:
+            logger.exception("Search failed: %s", e)
+            search_results = []
 
     if search_results:
         search_text = "\n".join([
