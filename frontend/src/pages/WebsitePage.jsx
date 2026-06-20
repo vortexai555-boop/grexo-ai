@@ -64,8 +64,21 @@ export default function WebsitePage() {
     if (!desc || generating) return;
     setGenerating(true);
     setCurrent(null);
+
+    const filesBase64 = await Promise.all(
+      attachments.map((file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve({ mime: file.type, data: reader.result.split(',')[1] });
+          reader.onerror = (error) => reject(error);
+        });
+      })
+    );
+    setAttachments([]);
+
     try {
-      const start = await api.post("/website/generate", { description: desc, site_type: siteType });
+      const start = await api.post("/website/generate", { description: desc, site_type: siteType, files: filesBase64 });
       const jobId = start.data.job_id;
       if (!jobId) throw new Error("No job id returned");
       // Poll job status every 2 seconds, timeout after 5 minutes
