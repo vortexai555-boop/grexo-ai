@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Globe, Sparkle, Code as CodeIcon, DownloadSimple, ArrowsClockwise, ClipboardText, MonitorPlay, PlusCircle
+  Globe, Sparkle, Code as CodeIcon, DownloadSimple, ArrowsClockwise, ClipboardText, MonitorPlay, PlusCircle, X
 } from "@phosphor-icons/react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -36,7 +36,19 @@ export default function WebsitePage() {
   const [generating, setGenerating] = useState(false);
   const [current, setCurrent] = useState(null); // { id, html, description }
   const [history, setHistory] = useState([]);
+  const [attachments, setAttachments] = useState([]);
   const iframeRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setAttachments((prev) => [...prev, ...Array.from(e.target.files)]);
+    }
+    e.target.value = null; // reset
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const loadHistory = async () => {
     try {
@@ -134,6 +146,18 @@ export default function WebsitePage() {
           <div className="lg:col-span-4">
             <div className="glass rounded-2xl p-6 sticky top-6">
               <div className="text-mono-accent mb-2">Describe your website</div>
+              {attachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {attachments.map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-xs text-slate-300">
+                      <span className="truncate max-w-[120px]">{file.name}</span>
+                      <button type="button" onClick={() => removeAttachment(i)} className="text-slate-400 hover:text-white">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="relative">
                 <Textarea
                   value={description}
@@ -145,7 +169,7 @@ export default function WebsitePage() {
                 <div className="absolute left-2 bottom-2">
                   <label className="p-2 flex justify-center items-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 cursor-pointer transition-colors" title="Upload file or image">
                     <PlusCircle size={20} weight="regular" />
-                    <input type="file" multiple className="hidden" />
+                    <input type="file" multiple className="hidden" onChange={handleFileChange} />
                   </label>
                 </div>
               </div>
