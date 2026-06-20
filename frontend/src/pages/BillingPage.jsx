@@ -44,7 +44,7 @@ export default function BillingPage() {
   const currency = settings?.currency || "USD";
   const currentPlan = user?.plan || "free";
 
-  const goPay = (planId) => navigate(`/dashboard/payment?plan=${planId}`);
+  const goPay = (planId) => navigate(`/dashboard/payment?plan=${encodeURIComponent(planId)}`);
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
@@ -109,6 +109,10 @@ export default function BillingPage() {
                     {p.price > 0 && <span className="text-sm text-slate-400 mb-1">/ mo</span>}
                   </div>
                   <ul className="mt-8 space-y-4">
+                    <li className="flex items-start text-slate-300 text-sm">
+                      <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-vortex-cyan`} />
+                      {p.credits?.toLocaleString() ?? 0} credits included
+                    </li>
                     {p.features?.map((b, _i) => (
                       <li key={_i} className="flex items-start text-slate-300 text-sm">
                         <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-vortex-cyan`} />
