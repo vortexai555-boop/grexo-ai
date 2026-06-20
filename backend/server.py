@@ -491,45 +491,37 @@ async def chat_send(
     current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
     
     try:
+        contents = []
+        for m in history[:-1]:
+            contents.append(
+                types.Content(
+                    role="user" if m["role"] == "user" else "model",
+                    parts=[types.Part.from_text(text=m["content"])]
+                )
+            )
+            
+        user_parts = [types.Part.from_text(text=body.message)]
         if body.files:
             import base64
-            gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
-            contents = [gemini_prompt]
             for file in body.files:
                 b64_data = file["data"]
                 if "," in b64_data:
                     b64_data = b64_data.split(",", 1)[1]
-                contents.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
-            
-            resp = await ai_client.aio.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system + current_date_info,
-                    tools=[{"google_search": {}}] if body.web_search else []
-                )
-            )
-            reply = resp.text
-        elif body.web_search:
-            # Use Gemini with Google Search tool
-            gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
-            resp = await ai_client.aio.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=gemini_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system + current_date_info,
-                    tools=[{"google_search": {}}]
-                )
-            )
-            reply = resp.text
-        else:
-            # Use Gemini without search tool
-            prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
-            messages = [
-                {"role": "system", "content": system + current_date_info},
-                {"role": "user", "content": prompt}
-            ]
-            reply = await generate_text_free(messages)
+                user_parts.append(types.Part.from_bytes(data=base64.b64decode(b64_data), mime_type=file.get("mime", "application/pdf")))
+        contents.append(types.Content(role="user", parts=user_parts))
+
+        config_kwargs = {
+            "system_instruction": system + current_date_info
+        }
+        if body.web_search:
+            config_kwargs["tools"] = [{"google_search": {}}]
+
+        resp = await ai_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=types.GenerateContentConfig(**config_kwargs)
+        )
+        reply = resp.text
 
         if not reply:
             reply = "No response from model."
@@ -602,7 +594,7 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
             
             contents = [
                 system_instruction,
-                {"mime_type": mime_type, "data": base64.b64decode(b64_data)},
+                types.Part.from_bytes(data=base64.b64decode(b64_data), mime_type=mime_type),
                 user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
             ]
             
@@ -828,7 +820,7 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
                 b64_data = file["data"]
                 if "," in b64_data:
                     b64_data = b64_data.split(",", 1)[1]
-                user_content.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
+                user_content.append(types.Part.from_bytes(data=base64.b64decode(b64_data), mime_type=file.get("mime", "application/pdf")))
             
             resp = await ai_client.aio.models.generate_content(
                 model='gemini-2.5-flash',
