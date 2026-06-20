@@ -73,7 +73,7 @@ class ChatMessageIn(BaseModel):
     message: str
     tool: str = "chat"
     web_search: bool = False
-
+    files: Optional[List[Dict[str, str]]] = None # list of {"mime": "...", "data": "base64"}
 
 class CalcIn(BaseModel):
     expression: str
@@ -115,6 +115,7 @@ class BusinessIn(BaseModel):
 class WebsiteIn(BaseModel):
     description: str
     site_type: str = "landing"
+    files: Optional[List[Dict[str, str]]] = None
 
 
 def now_utc() -> datetime: return datetime.now(timezone.utc)
@@ -490,7 +491,26 @@ async def chat_send(
     current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
     
     try:
-        if body.web_search:
+        if body.files:
+            import base64
+            gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
+            contents = [gemini_prompt]
+            for file in body.files:
+                b64_data = file["data"]
+                if "," in b64_data:
+                    b64_data = b64_data.split(",", 1)[1]
+                contents.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
+            
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system + current_date_info,
+                    tools=[{"google_search": {}}] if body.web_search else []
+                )
+            )
+            reply = resp.text
+        elif body.web_search:
             # Use Gemini with Google Search tool
             gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
             resp = await ai_client.aio.models.generate_content(
@@ -503,7 +523,7 @@ async def chat_send(
             )
             reply = resp.text
         else:
-            # Use pollinations
+            # Use Gemini without search tool
             prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
             messages = [
                 {"role": "system", "content": system + current_date_info},
@@ -788,18 +808,39 @@ async def website_generate(body: WebsiteIn, user=Depends(get_current_user)):
     await db.website_jobs.insert_one(job.copy())
     # Reserve credits up front so concurrent requests can't double-spend
     await deduct_credits(user["user_id"], 3)
-    asyncio.create_task(_run_website_job(job_id, user["user_id"], body.description, body.site_type))
+    files_data = body.files or []
+    asyncio.create_task(_run_website_job(job_id, user["user_id"], body.description, body.site_type, files_data))
     return {"job_id": job_id, "status": "pending"}
 
 
-async def _run_website_job(job_id: str, user_id: str, description: str, site_type: str):
+async def _run_website_job(job_id: str, user_id: str, description: str, site_type: str, files_data: list):
     prompt = (
         f"Build a beautiful, modern, fully responsive {site_type} website as a SINGLE self-contained HTML file. "
         f"Requirements: {description}. Use inline CSS and JS. Include header, hero, features, CTA, footer. "
         f"Return ONLY the HTML inside a ```html fenced block."
     )
     try:
-        out = await llm_complete(SYSTEM_PROMPTS["website"], prompt)
+        if files_data:
+            import base64
+            contents = [{"role": "system", "content": SYSTEM_PROMPTS["website"]}]
+            user_content = [prompt]
+            for file in files_data:
+                b64_data = file["data"]
+                if "," in b64_data:
+                    b64_data = b64_data.split(",", 1)[1]
+                user_content.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
+            
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPTS["website"]
+                )
+            )
+            out = resp.text
+        else:
+            out = await llm_complete(SYSTEM_PROMPTS["website"], prompt)
+        
         html = out
         if "```html" in out:
             html = out.split("```html", 1)[1].split("```", 1)[0].strip()
