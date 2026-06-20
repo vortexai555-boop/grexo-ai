@@ -14,8 +14,8 @@ export default function PaymentPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const planParam = (searchParams.get("plan") || "pro").toLowerCase();
-  const plan = ["pro", "business"].includes(planParam) ? planParam : "pro";
-
+  const [planId, setPlanId] = useState(planParam);
+  const [plans, setPlans] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -29,20 +29,34 @@ export default function PaymentPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await api.get("/payment-settings");
-        setSettings(r.data);
+        const [rSettings, rPlans] = await Promise.all([
+          api.get("/payment-settings"),
+          api.get("/plans")
+        ]);
+        setSettings(rSettings.data);
+        setPlans(rPlans.data || []);
+        
+        // If planParam is valid in dynamic plans, keep it, otherwise fallback to pro
+        if (rPlans.data && !rPlans.data.find(p => p.id === planParam) && planParam !== "pro" && planParam !== "business") {
+          setPlanId("pro");
+        } else {
+          setPlanId(planParam);
+        }
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [planParam]);
 
   useEffect(() => {
     if (user) setForm((f) => ({ ...f, name: f.name || user.name || "", email: f.email || user.email || "" }));
   }, [user]);
 
-  const price = plan === "pro" ? (settings?.pro_price ?? 29) : (settings?.business_price ?? 99);
-  const currency = settings?.currency || "USD";
+  const activePlanObj = plans.find(p => p.id === planId) || { name: planId, price: planId === "pro" ? (settings?.pro_price ?? 29) : (settings?.business_price ?? 99), currency: settings?.currency };
+  
+  const price = activePlanObj.price;
+  // Use plan specific currency if set, otherwise global settings currency
+  const currency = activePlanObj.currency || settings?.currency || "USD";
   const currencySymbol = currency === "INR" ? "₹" : "$";
 
   const submit = async (e) => {
@@ -55,7 +69,7 @@ export default function PaymentPage() {
     setSubmitting(true);
     try {
       const r = await api.post("/payments", {
-        plan,
+        plan: planId,
         name: form.name.trim(),
         email: form.email.trim(),
         utr_number: form.utr_number.trim(),
@@ -89,7 +103,7 @@ export default function PaymentPage() {
 
         <div className="text-mono-accent mb-2">Checkout</div>
         <h1 className="text-4xl font-light tracking-tighter">
-          Activate <span className="text-gradient-cyan font-medium capitalize">{plan}</span> plan
+          Activate <span className="text-gradient-cyan font-medium capitalize">{activePlanObj.name}</span> plan
         </h1>
         <p className="mt-2 text-slate-400">Pay manually via UPI / bank transfer using the QR code, then submit your transaction details below for verification.</p>
 
@@ -105,7 +119,7 @@ export default function PaymentPage() {
             </div>
             <h2 className="mt-6 text-2xl font-medium">Payment submitted</h2>
             <p className="mt-2 text-slate-400 max-w-md mx-auto">
-              Your payment is now <span className="text-yellow-300">pending verification</span>. We'll review it shortly and unlock your <span className="capitalize">{plan}</span> plan within minutes.
+              Your payment is now <span className="text-yellow-300">pending verification</span>. We'll review it shortly and unlock your <span className="capitalize">{activePlanObj.name}</span> plan within minutes.
             </p>
             <div className="mt-6 text-xs text-slate-500">Reference ID: <span className="font-mono">{submitted.id}</span></div>
             <div className="mt-8 flex items-center justify-center gap-3">
@@ -145,7 +159,7 @@ export default function PaymentPage() {
               <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
                 <div className="bg-white/[0.03] border border-white/5 rounded-lg p-3">
                   <div className="text-mono-accent mb-1">Plan</div>
-                  <div className="capitalize font-medium" data-testid="payment-plan-label">{plan}</div>
+                  <div className="capitalize font-medium" data-testid="payment-plan-label">{activePlanObj.name}</div>
                 </div>
                 <div className="bg-white/[0.03] border border-white/5 rounded-lg p-3">
                   <div className="text-mono-accent mb-1">Amount</div>
