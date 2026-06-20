@@ -6,28 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Check, CreditCard, Clock, X, Lightning } from "@phosphor-icons/react";
-
-const PLANS = [
-  {
-    id: "free", label: "Free", priceDefault: 0,
-    bullets: ["100 credits / month", "All AI tools (basic limits)", "Save chat history"],
-    cta: "Current",
-    accent: false,
-  },
-  {
-    id: "pro", label: "Pro", priceDefault: 29,
-    bullets: ["2,000 credits / month", "Priority generation", "Image + Website + Code AI", "Export everything"],
-    cta: "Upgrade to Pro",
-    accent: true,
-  },
-  {
-    id: "business", label: "Business", priceDefault: 99,
-    bullets: ["Unlimited credits", "Priority support", "Team-ready (soon)", "Advanced analytics"],
-    cta: "Get Business",
-    accent: false,
-  },
-];
+import { Check, CreditCard, Clock, X, Lightning, Copy } from "@phosphor-icons/react";
 
 const STATUS_BADGE = {
   pending: { label: "Pending review", className: "bg-yellow-500/15 text-yellow-300 border border-yellow-500/30" },
@@ -42,28 +21,25 @@ export default function BillingPage() {
   const [sub, setSub] = useState(null);
   const [history, setHistory] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [plans, setPlans] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [s, m, p] = await Promise.all([
+        const [s, m, p, pl] = await Promise.all([
           api.get("/payment-settings"),
           api.get("/subscriptions/me"),
           api.get("/payments/me"),
+          api.get("/plans")
         ]);
         setSettings(s.data);
         setSub(m.data.active);
         setHistory(m.data.history || []);
         setPayments(p.data || []);
+        setPlans(pl.data || []);
       } catch (_e) { /* ignore */ }
     })();
   }, []);
-
-  const priceFor = (id) => {
-    if (id === "pro") return settings?.pro_price ?? 29;
-    if (id === "business") return settings?.business_price ?? 99;
-    return 0;
-  };
 
   const currency = settings?.currency || "USD";
   const currentPlan = user?.plan || "free";
@@ -110,45 +86,52 @@ export default function BillingPage() {
           </Badge>
         </div>
 
-        {/* Pricing grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          {PLANS.map((p, i) => {
+        {/* Dynamic Plans Table */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {plans.map((p, i) => {
             const isCurrent = currentPlan === p.id;
             return (
               <motion.div
                 key={p.id}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={`rounded-2xl p-7 transition-all hover:-translate-y-1 ${p.accent ? "glass-strong border-[#00F0FF]/40 glow-cyan-strong" : "glass"}`}
-                data-testid={`billing-plan-${p.id}`}
+                transition={{ delay: i * 0.1 }}
+                className={`rounded-3xl p-8 relative flex flex-col justify-between overflow-hidden shadow-2xl transition hover:transform hover:scale-[1.02] border ${
+                  isCurrent ? "border-vortex-cyan bg-vortex-cyan/5" : "border-white/5 glass"
+                }`}
               >
-                <div className="flex items-baseline justify-between">
-                  <h3 className="text-xl font-medium">{p.label}</h3>
-                  {p.accent && <span className="text-mono-accent">Recommended</span>}
+                <div>
+                  <h3 className="text-xl font-medium mb-2 uppercase">{p.name}</h3>
+                  <div className="mt-4 flex items-end gap-2">
+                    <span className="text-4xl font-light">
+                      {p.price > 0 ? (currency === "INR" ? "₹" : "$") + p.price : "Free"}
+                    </span>
+                    {p.price > 0 && <span className="text-sm text-slate-400 mb-1">/ mo</span>}
+                  </div>
+                  <ul className="mt-8 space-y-4">
+                    {p.features?.map((b, _i) => (
+                      <li key={_i} className="flex items-start text-slate-300 text-sm">
+                        <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-vortex-cyan`} />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-4xl font-light" data-testid={`billing-price-${p.id}`}>
-                    {p.id === "free" ? "Free" : `${currency === "INR" ? "₹" : "$"}${priceFor(p.id)}`}
-                  </span>
-                  {p.id !== "free" && <span className="text-slate-500 text-sm">/mo</span>}
+                <div className="mt-10">
+                  {isCurrent ? (
+                    <Button variant="outline" className="w-full justify-center pointer-events-none border-white/10 text-slate-300" data-testid={`billing-plan-${p.id}-current`}>
+                      Current Plan
+                    </Button>
+                  ) : p.purchasable ? (
+                    <Button variant="default" onClick={() => goPay(p.id)} className={`w-full justify-center bg-vortex-cyan text-black hover:bg-vortex-cyan/90`} data-testid={`billing-plan-upgrade-${p.id}`}>
+                      {p.price === 0 ? "Downgrade" : "Upgrade to " + p.name} <Lightning size={16} className="ml-2" />
+                    </Button>
+                  ) : (
+                    <Button variant="outline" disabled className="w-full justify-center border-white/5 text-slate-500">
+                      Unavailable
+                    </Button>
+                  )}
                 </div>
-                <ul className="mt-5 space-y-2.5 text-sm text-slate-300">
-                  {p.bullets.map((b) => (
-                    <li key={b} className="flex items-start gap-2">
-                      <Check size={14} weight="bold" className="text-vortex-cyan mt-1 shrink-0" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  disabled={isCurrent || p.id === "free"}
-                  onClick={() => goPay(p.id)}
-                  className={`mt-6 w-full h-11 ${p.accent && !isCurrent ? "btn-primary-vortex" : "btn-ghost-vortex"} ${isCurrent ? "opacity-60 cursor-default" : ""}`}
-                  data-testid={`billing-cta-${p.id}`}
-                >
-                  {isCurrent ? "Current plan" : p.cta}
-                </Button>
               </motion.div>
             );
           })}
