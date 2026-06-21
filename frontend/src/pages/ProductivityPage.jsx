@@ -158,7 +158,7 @@ export default function ProductivityPage() {
               </label>
               <div className="relative">
                 <textarea 
-                  className="w-full bg-black/30 border border-white/10 rounded-xl p-4 pb-12 text-white focus:outline-none focus:border-grexo-cyan/50 focus:ring-1 focus:ring-grexo-cyan/50 min-h-[100px] resize-none transition-all"
+                  className="w-full bg-[#0A0A12] border border-white/10 rounded-xl p-4 pb-12 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F0FF]/50 focus:ring-1 focus:ring-[#00F0FF]/50 min-h-[100px] resize-none transition-all"
                   placeholder="Type here..."
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
@@ -188,7 +188,7 @@ export default function ProductivityPage() {
               </label>
               <div className="relative">
                 <textarea 
-                  className="w-full bg-black/30 border border-white/10 rounded-xl p-4 pb-12 text-white focus:outline-none focus:border-grexo-cyan/50 focus:ring-1 focus:ring-grexo-cyan/50 min-h-[150px] resize-none transition-all"
+                  className="w-full bg-[#0A0A12] border border-white/10 rounded-xl p-4 pb-12 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F0FF]/50 focus:ring-1 focus:ring-[#00F0FF]/50 min-h-[150px] resize-none transition-all"
                   placeholder="Paste the source text here..."
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
