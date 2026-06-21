@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import GrexoLogo from "@/components/GrexoLogo";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Marquee from "react-fast-marquee";
-import { ChatCircleDots, Sparkle, ShieldCheck, Lightning, Globe, Code, MagicWand, FileText } from "@phosphor-icons/react";
+import { ChatCircleDots, Sparkle, ShieldCheck, Lightning, Globe, Code, MagicWand, FileText, List, X } from "@phosphor-icons/react";
 
 const HERO_BG = "https://images.pexels.com/photos/12707786/pexels-photo-12707786.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 const AVATARS = [
@@ -33,26 +33,66 @@ const testimonials = [
 ];
 
 export default function Landing() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-grexo-bg text-white relative overflow-hidden">
+    <div className="min-h-screen bg-grexo-bg text-white relative overflow-hidden" id="top">
       <div className="grexo-grain absolute inset-0 opacity-30 pointer-events-none" />
 
       {/* NAV */}
-      <header className="fixed top-0 left-0 right-0 z-50">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-grexo-bg/80 backdrop-blur-md border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <GrexoLogo />
+          
           <nav className="hidden md:flex items-center gap-8 text-sm text-slate-300">
-            <a href="/" className="hover:text-white transition" data-testid="nav-home">Home</a>
+            <a href="#top" className="hover:text-white transition" data-testid="nav-home">Home</a>
             <a href="#features" className="hover:text-white transition" data-testid="nav-features">Features</a>
             <a href="#pricing" className="hover:text-white transition" data-testid="nav-pricing">Pricing</a>
             <a href="#testimonials" className="hover:text-white transition" data-testid="nav-testimonials">Reviews</a>
             <a href="#faq" className="hover:text-white transition" data-testid="nav-faq">FAQ</a>
           </nav>
-          <div className="flex items-center gap-3">
+          
+          <div className="hidden md:flex items-center gap-3">
             <Link to="/login"><Button variant="ghost" className="text-slate-200 hover:bg-white/5" data-testid="nav-login">Sign in</Button></Link>
             <Link to="/signup"><Button className="btn-primary-grexo" data-testid="nav-signup">Start Free</Button></Link>
           </div>
+
+          <button 
+            className="md:hidden text-white p-2"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X size={28} /> : <List size={28} />}
+          </button>
         </div>
+
+        {/* MOBILE MENU */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t border-white/10 bg-grexo-bg/95 backdrop-blur-lg overflow-hidden"
+            >
+              <nav className="flex flex-col px-6 py-6 gap-6 text-base text-slate-300">
+                <a href="#top" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Home</a>
+                <a href="#features" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Features</a>
+                <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Pricing</a>
+                <a href="#testimonials" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Reviews</a>
+                <a href="#faq" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">FAQ</a>
+                
+                <div className="flex flex-col gap-3 mt-4 pt-6 border-t border-white/10">
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-center text-slate-200 hover:bg-white/5">Sign in</Button>
+                  </Link>
+                  <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button className="w-full justify-center btn-primary-grexo">Start Free</Button>
+                  </Link>
+                </div>
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* HERO */}
