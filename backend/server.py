@@ -17,16 +17,44 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, EmailStr
 import base64
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
-ai_client = AsyncOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY", "")
-)
+ai_client = genai.Client()
+
+def convert_messages(messages):
+    contents = []
+    system_instruction = None
+    for m in messages:
+        if m["role"] == "system":
+            system_instruction = m["content"]
+            continue
+            
+        role = "user" if m["role"] == "user" else "model"
+        if isinstance(m["content"], str):
+            parts = [{"text": m["content"]}]
+        else:
+            parts = []
+            for item in m["content"]:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    parts.append({"text": item["text"]})
+                elif isinstance(item, dict) and item.get("type") == "image_url":
+                    url = item["image_url"]["url"]
+                    mime = url.split(";")[0].split(":")[1]
+                    b64_data = url.split(",")[1]
+                    parts.append({
+                        "inline_data": {
+                            "data": b64_data,
+                            "mime_type": mime
+                        }
+                    })
+        contents.append({"role": role, "parts": parts})
+    return contents, system_instruction
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -220,15 +248,17 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
 
 async def generate_text_free(messages: list) -> str:
     try:
-        final_msgs = []
-        for m in messages:
-            final_msgs.append({"role": m["role"], "content": m["content"]})
+        contents, system_instruction = convert_messages(messages)
+        config = types.GenerateContentConfig()
+        if system_instruction:
+            config.system_instruction = system_instruction
             
-        resp = await ai_client.chat.completions.create(
-            model='google/gemini-2.5-flash',
-            messages=final_msgs
+        resp = await ai_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=config
         )
-        return resp.choices[0].message.content
+        return resp.text
     except Exception as e:
         logger.exception("Free text generation failed: %s", e)
         raise e
@@ -524,11 +554,17 @@ async def chat_send(
                 
         messages.append({"role": "user", "content": user_content})
 
-        resp = await ai_client.chat.completions.create(
-            model='google/gemini-2.5-flash',
-            messages=messages
+        contents, system_instruction = convert_messages(messages)
+        config = types.GenerateContentConfig()
+        if system_instruction:
+            config.system_instruction = system_instruction
+
+        resp = await ai_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=config
         )
-        reply = resp.choices[0].message.content
+        reply = resp.text
 
         if not reply:
             reply = "No response from model."
@@ -613,11 +649,17 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
                 {"role": "user", "content": user_content}
             ]
             
-            resp = await ai_client.chat.completions.create(
-                model='google/gemini-2.5-flash',
-                messages=messages
+            contents, sys_inst = convert_messages(messages)
+            config = types.GenerateContentConfig()
+            if sys_inst:
+                config.system_instruction = sys_inst
+                
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=contents,
+                config=config
             )
-            reply = resp.choices[0].message.content
+            reply = resp.text
         else:
             messages = [{"role": "system", "content": system_instruction}]
             prompt_with_files = user_prompt or "Please provide input."
@@ -844,11 +886,17 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
                 {"role": "user", "content": user_content}
             ]
             
-            resp = await ai_client.chat.completions.create(
-                model='google/gemini-2.5-flash',
-                messages=messages
+            contents, sys_inst = convert_messages(messages)
+            config = types.GenerateContentConfig()
+            if sys_inst:
+                config.system_instruction = sys_inst
+                
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=contents,
+                config=config
             )
-            out = resp.choices[0].message.content
+            out = resp.text
         else:
             out = await llm_complete(SYSTEM_PROMPTS["website"], prompt)
         
