@@ -538,6 +538,14 @@ async def chat_send(
             })
             
         user_content = []
+        if body.web_search:
+            search_results = await web_search(body.message)
+            if search_results:
+                search_context = "Search Results:\n"
+                for res in search_results:
+                    search_context += f"- {res.get('title', '')}: {res.get('body', '')} ({res.get('href', '')})\n"
+                user_content.append({"type": "text", "text": f"{search_context}\n\nPlease use the above search results to answer the query: "})
+                
         if body.message:
             user_content.append({"type": "text", "text": body.message})
             
