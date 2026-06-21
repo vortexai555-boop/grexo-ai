@@ -1,4 +1,4 @@
-"""grexo ai - Premium AI SaaS Platform Backend."""
+"""GREXO AI - Premium AI SaaS Platform Backend."""
 
 import os
 import uuid
@@ -16,45 +16,17 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, EmailStr
-import base64
 from google import genai
 from google.genai import types
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
-ai_client = genai.Client()
-
-def convert_messages(messages):
-    contents = []
-    system_instruction = None
-    for m in messages:
-        if m["role"] == "system":
-            system_instruction = m["content"]
-            continue
-            
-        role = "user" if m["role"] == "user" else "model"
-        if isinstance(m["content"], str):
-            parts = [{"text": m["content"]}]
-        else:
-            parts = []
-            for item in m["content"]:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    parts.append({"text": item["text"]})
-                elif isinstance(item, dict) and item.get("type") == "image_url":
-                    url = item["image_url"]["url"]
-                    mime = url.split(";")[0].split(":")[1]
-                    b64_data = url.split(",")[1]
-                    parts.append({
-                        "inline_data": {
-                            "data": b64_data,
-                            "mime_type": mime
-                        }
-                    })
-        contents.append({"role": role, "parts": parts})
-    return contents, system_instruction
-
+ai_client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY", "")
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -76,7 +48,7 @@ ENTERPRISE_CREDITS = 99999
 CHAT_MODEL = ("anthropic", "claude-sonnet-4-5-20250929")
 IMAGE_MODEL = "imagen-4.0-fast-generate-001"
 
-app = FastAPI(title="grexo ai")
+app = FastAPI(title="Grexo AI")
 api = APIRouter(prefix="/api")
 
 
@@ -155,7 +127,7 @@ def verify_pw(pw: str, hashed: str) -> bool:
     except Exception: return False
 
 def make_jwt(user_id: str) -> str:
-    payload = {"sub": user_id, "iat": int(now_utc().timestamp()), "exp": int((now_utc() + timedelta(days=36500)).timestamp())}
+    payload = {"sub": user_id, "iat": int(now_utc().timestamp()), "exp": int((now_utc() + timedelta(days=7)).timestamp())}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
 def decode_jwt(token: str) -> Optional[str]:
@@ -189,23 +161,6 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-
-    should_update = True
-    last_active = user.get("last_active_at")
-    if last_active:
-        last_active_dt = datetime.fromisoformat(last_active)
-        if last_active_dt.tzinfo is None:
-            last_active_dt = last_active_dt.replace(tzinfo=timezone.utc)
-        if now_utc() - last_active_dt > timedelta(days=15):
-            raise HTTPException(status_code=401, detail="Session expired due to inactivity")
-        if now_utc() - last_active_dt < timedelta(hours=1):
-            should_update = False
-
-    if should_update:
-        now_str = now_utc().isoformat()
-        await db.users.update_one({"user_id": user_id}, {"$set": {"last_active_at": now_str}})
-        user["last_active_at"] = now_str
-
     return user
 
 async def require_credits(user: Dict[str, Any], cost: int = 1):
@@ -248,15 +203,22 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
 
 async def generate_text_free(messages: list) -> str:
     try:
-        contents, system_instruction = convert_messages(messages)
-        config = types.GenerateContentConfig()
-        if system_instruction:
-            config.system_instruction = system_instruction
+        system = ""
+        prompt = ""
+        for m in messages:
+            if m["role"] == "system":
+                system += m["content"] + "\n"
+            else:
+                prompt += m["content"] + "\n"
+                
+        config_kwargs = {}
+        if system.strip():
+            config_kwargs["system_instruction"] = system.strip()
             
         resp = await ai_client.aio.models.generate_content(
             model='gemini-2.5-flash',
-            contents=contents,
-            config=config
+            contents=prompt.strip(),
+            config=types.GenerateContentConfig(**config_kwargs)
         )
         return resp.text
     except Exception as e:
@@ -400,10 +362,10 @@ async def google_session(response: Response, x_session_id: Optional[str] = Heade
         })
     await db.user_sessions.insert_one({
         "user_id": user_id, "session_token": data["session_token"],
-        "expires_at": (now_utc() + timedelta(days=36500)).isoformat(),
+        "expires_at": (now_utc() + timedelta(days=7)).isoformat(),
         "created_at": now_utc().isoformat(),
     })
-    response.set_cookie(key="session_token", value=data["session_token"], httponly=True, secure=True, samesite="none", max_age=36500*24*60*60, path="/")
+    response.set_cookie(key="session_token", value=data["session_token"], httponly=True, secure=True, samesite="none", max_age=7*24*60*60, path="/")
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return {"user": user, "session_token": data["session_token"]}
 
@@ -421,11 +383,11 @@ async def logout(response: Response, authorization: Optional[str] = Header(None)
 
 
 SYSTEM_PROMPTS = {
-    "chat": "You are grexo ai Assistant — a brilliant, friendly, helpful AI. Be concise, clear, and impressive.",
-    "code": "You are grexo Code — an expert software engineer. Return clean, production-ready code in fenced markdown code blocks and brief explanations.",
-    "content": "You are grexo Content — a world-class copywriter and SEO expert. Produce engaging, well-formatted content.",
-    "business": "You are grexo Business — a senior business consultant. Produce structured, actionable, market-aware strategies.",
-    "website": "You are grexo Web — an expert frontend engineer. When asked, output a SINGLE complete HTML file with inline CSS+JS in a ```html code block.",
+    "chat": "You are GREXO AI Assistant — a brilliant, friendly, helpful AI. Be concise, clear, and impressive.",
+    "code": "You are GREXO Code — an expert software engineer. Return clean, production-ready code in fenced markdown code blocks and brief explanations.",
+    "content": "You are GREXO Content — a world-class copywriter and SEO expert. Produce engaging, well-formatted content.",
+    "business": "You are GREXO Business — a senior business consultant. Produce structured, actionable, market-aware strategies.",
+    "website": "You are GREXO Web — an expert frontend engineer. When asked, output a SINGLE complete HTML file with inline CSS+JS in a ```html code block.",
     "calculator": "Calculator"
 }
 
@@ -529,50 +491,45 @@ async def chat_send(
     current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
     
     try:
-        messages = [{"role": "system", "content": system + current_date_info}]
-        
-        for m in history[:-1]:
-            messages.append({
-                "role": "user" if m["role"] == "user" else "assistant",
-                "content": m["content"]
-            })
-            
-        user_content = []
-        if body.web_search:
-            search_results = await web_search(body.message)
-            if search_results:
-                search_context = "Search Results:\n"
-                for res in search_results:
-                    search_context += f"- {res.get('title', '')}: {res.get('body', '')} ({res.get('href', '')})\n"
-                user_content.append({"type": "text", "text": f"{search_context}\n\nPlease use the above search results to answer the query: "})
-                
-        if body.message:
-            user_content.append({"type": "text", "text": body.message})
-            
         if body.files:
+            import base64
+            gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
+            contents = [gemini_prompt]
             for file in body.files:
                 b64_data = file["data"]
                 if "," in b64_data:
                     b64_data = b64_data.split(",", 1)[1]
-                mime = file.get("mime", "image/png")
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{b64_data}"}
-                })
-                
-        messages.append({"role": "user", "content": user_content})
-
-        contents, system_instruction = convert_messages(messages)
-        config = types.GenerateContentConfig()
-        if system_instruction:
-            config.system_instruction = system_instruction
-
-        resp = await ai_client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=contents,
-            config=config
-        )
-        reply = resp.text
+                contents.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
+            
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system + current_date_info,
+                    tools=[{"google_search": {}}] if body.web_search else []
+                )
+            )
+            reply = resp.text
+        elif body.web_search:
+            # Use Gemini with Google Search tool
+            gemini_prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=gemini_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system + current_date_info,
+                    tools=[{"google_search": {}}]
+                )
+            )
+            reply = resp.text
+        else:
+            # Use Gemini without search tool
+            prompt = f"Previous Conversation:\n{transcript}\n\nUser Question:\n{body.message}"
+            messages = [
+                {"role": "system", "content": system + current_date_info},
+                {"role": "user", "content": prompt}
+            ]
+            reply = await generate_text_free(messages)
 
         if not reply:
             reply = "No response from model."
@@ -636,36 +593,22 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
 
     try:
         if body.file_data:
-            # Use OpenAI compatible format
-            mime_type = body.file_mime or "image/png"
+            import base64
+            # Use Gemini API for multimodal reading
+            mime_type = body.file_mime or "application/pdf"
             b64_data = body.file_data
             if "," in b64_data:
                 b64_data = b64_data.split(",", 1)[1]
             
-            user_content = []
-            text_prompt = user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
-            if text_prompt:
-                user_content.append({"type": "text", "text": text_prompt})
-            
-            user_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{mime_type};base64,{b64_data}"}
-            })
-            
-            messages = [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content}
+            contents = [
+                system_instruction,
+                {"mime_type": mime_type, "data": base64.b64decode(b64_data)},
+                user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
             ]
             
-            contents, sys_inst = convert_messages(messages)
-            config = types.GenerateContentConfig()
-            if sys_inst:
-                config.system_instruction = sys_inst
-                
             resp = await ai_client.aio.models.generate_content(
                 model='gemini-2.5-flash',
-                contents=contents,
-                config=config
+                contents=contents
             )
             reply = resp.text
         else:
@@ -878,31 +821,21 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
     )
     try:
         if files_data:
-            user_content = [{"type": "text", "text": prompt}]
+            import base64
+            contents = [{"role": "system", "content": SYSTEM_PROMPTS["website"]}]
+            user_content = [prompt]
             for file in files_data:
                 b64_data = file["data"]
                 if "," in b64_data:
                     b64_data = b64_data.split(",", 1)[1]
-                mime = file.get("mime", "image/png")
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{b64_data}"}
-                })
+                user_content.append({"mime_type": file.get("mime", "application/pdf"), "data": base64.b64decode(b64_data)})
             
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPTS["website"]},
-                {"role": "user", "content": user_content}
-            ]
-            
-            contents, sys_inst = convert_messages(messages)
-            config = types.GenerateContentConfig()
-            if sys_inst:
-                config.system_instruction = sys_inst
-                
             resp = await ai_client.aio.models.generate_content(
                 model='gemini-2.5-flash',
-                contents=contents,
-                config=config
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPTS["website"]
+                )
             )
             out = resp.text
         else:
@@ -972,10 +905,8 @@ async def dashboard_summary(user=Depends(get_current_user)):
 @api.post("/billing/upgrade")
 async def billing_upgrade(plan: str, user=Depends(get_current_user)):
     plan = plan.lower()
-    plans = await _get_all_plans()
-    plan_info = next((p for p in plans if p["id"] == plan), None)
-    if not plan_info: raise HTTPException(status_code=400, detail="Invalid plan")
-    credits = plan_info.get("credits", 0)
+    credits = {"free": FREE_CREDITS, "pro": PRO_CREDITS, "enterprise": ENTERPRISE_CREDITS}.get(plan)
+    if credits is None: raise HTTPException(status_code=400, detail="Invalid plan")
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"plan": plan, "credits": credits}})
     return {"ok": True, "plan": plan, "credits": credits}
 
@@ -1043,15 +974,6 @@ class PaymentSubmitIn(BaseModel):
     email: EmailStr
     utr_number: str
 
-class PlanIn(BaseModel):
-    id: str  # e.g., 'free', 'pro'
-    name: str
-    price: float
-    currency: str = "USD"
-    credits: int
-    purchasable: bool
-    features: List[str] = []
-
 
 def _public_settings(doc: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Return payment settings safe for public view."""
@@ -1085,41 +1007,6 @@ def _gen_activation_code(plan: str) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return prefix + "".join(secrets.choice(alphabet) for _ in range(6))
 
-
-# --- Plans CRUD ---
-async def _get_all_plans():
-    docs = await db.plans.find({}, {"_id": 0}).to_list(None)
-    if not docs:
-        docs = [
-            {"id": "free", "name": "Free", "price": 0, "credits": FREE_CREDITS, "purchasable": False, "features": ["Basic AI Chat"]},
-            {"id": "pro", "name": "Pro", "price": DEFAULT_PRICES["pro"], "credits": PRO_CREDITS, "purchasable": True, "features": ["Advanced Generation"]},
-            {"id": "business", "name": "Business", "price": DEFAULT_PRICES["business"], "credits": BUSINESS_CREDITS, "purchasable": True, "features": ["Team Management"]},
-            {"id": "enterprise", "name": "Enterprise", "price": 0, "credits": ENTERPRISE_CREDITS, "purchasable": False, "features": ["Dedicated Support"]},
-        ]
-        # Seed them so admin can edit them later
-        if db is not None and getattr(db, "plans", None) is not None:
-             await db.plans.insert_many([dict(d) for d in docs])
-    return docs
-
-@api.get("/plans")
-async def get_plans():
-    return await _get_all_plans()
-
-@api.post("/admin/plans")
-async def add_or_update_plan(body: PlanIn, admin=Depends(require_admin)):
-    data = body.dict()
-    data["updated_at"] = now_utc().isoformat()
-    await db.plans.update_one({"id": body.id}, {"$set": data}, upsert=True)
-    await _audit(admin, "update_plan", body.id, {"name": body.name, "price": body.price})
-    return {"ok": True, "plan": data}
-
-@api.delete("/admin/plans/{plan_id}")
-async def delete_plan(plan_id: str, admin=Depends(require_admin)):
-    if plan_id in ["free", "pro", "business", "enterprise"]:
-        raise HTTPException(status_code=400, detail="Cannot delete default plans")
-    await db.plans.delete_one({"id": plan_id})
-    await _audit(admin, "delete_plan", plan_id)
-    return {"ok": True}
 
 # --- Public read of payment settings (needed on /payment page) ---
 @api.get("/payment-settings")
@@ -1176,12 +1063,8 @@ async def delete_qr(admin=Depends(require_admin)):
 @api.post("/payments")
 async def submit_payment(body: PaymentSubmitIn, user=Depends(get_current_user)):
     plan = body.plan.lower()
-    plans = await _get_all_plans()
-    plan_info = next((p for p in plans if p["id"] == plan), None)
-    
-    if not plan_info or not plan_info.get("purchasable", False):
-        raise HTTPException(status_code=400, detail="Plan must be purchasable")
-        
+    if plan not in ALLOWED_PURCHASE_PLANS:
+        raise HTTPException(status_code=400, detail="Plan must be pro or business")
     settings = await db.payment_settings.find_one({"id": PAYMENT_SETTINGS_ID}, {"_id": 0})
     if settings and settings.get("qr_enabled") is False:
         raise HTTPException(status_code=400, detail="QR payments are currently disabled. Please contact support.")
@@ -1203,7 +1086,7 @@ async def submit_payment(body: PaymentSubmitIn, user=Depends(get_current_user)):
         "processed_at": None,
         "processed_by": None,
         "activation_code": None,
-        "amount": plan_info.get("price", 0),
+        "amount": (settings or {}).get(f"{plan}_price", DEFAULT_PRICES[plan]),
         "currency": (settings or {}).get("currency", DEFAULT_PRICES["currency"]),
     }
     await db.payments.insert_one(rec.copy())
@@ -1256,9 +1139,7 @@ async def admin_approve_payment(pid: str, admin=Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Payment already approved")
 
     plan = pay["plan"]
-    plans = await _get_all_plans()
-    plan_info = next((p for p in plans if p["id"] == plan), None)
-    if not plan_info:
+    if plan not in ALLOWED_PURCHASE_PLANS:
         raise HTTPException(status_code=400, detail="Unsupported plan on this payment")
 
     # Generate a globally unique activation code
@@ -1293,7 +1174,7 @@ async def admin_approve_payment(pid: str, admin=Depends(require_admin)):
     await db.subscriptions.insert_one(sub.copy())
 
     # Apply plan + credit grant to the user
-    credits_to_grant = plan_info.get("credits", FREE_CREDITS)
+    credits_to_grant = PLAN_TO_CREDITS.get(plan, FREE_CREDITS)
     await db.users.update_one(
         {"user_id": pay["user_id"]},
         {"$set": {"plan": plan, "credits": credits_to_grant, "active_activation_code": code}},
@@ -1334,24 +1215,6 @@ async def admin_list_subscriptions(_admin=Depends(require_admin)):
     docs = await db.subscriptions.find({}, {"_id": 0}).sort("start_date", -1).limit(500).to_list(500)
     return docs
 
-@api.delete("/admin/subscriptions/{sub_id}")
-async def admin_delete_subscription(sub_id: str, admin=Depends(require_admin)):
-    sub = await db.subscriptions.find_one({"id": sub_id})
-    if not sub:
-        raise HTTPException(404, "Subscription not found")
-    
-    await db.subscriptions.delete_one({"id": sub_id})
-    # Reset user to free plan
-    await db.users.update_one({"user_id": sub["user_id"]}, {"$set": {"plan": "free"}})
-    
-    await db.audit_log.insert_one({
-        "id": "aud_" + gen_id()[:8],
-        "ts": now_utc().isoformat(),
-        "admin_email": admin["email"],
-        "action": f"Deleted plan {sub['plan']} for user {sub['user_id']}"
-    })
-    return {"ok": True}
-
 
 # --- Admin: audit log ---
 @api.get("/admin/audit")
@@ -1361,7 +1224,7 @@ async def admin_audit(_admin=Depends(require_admin)):
 
 
 @api.get("/")
-async def root(): return {"app": "grexo ai", "ok": True}
+async def root(): return {"app": "GREXO AI", "ok": True}
 
 
 @app.on_event("startup")
