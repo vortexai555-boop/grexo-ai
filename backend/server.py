@@ -226,12 +226,25 @@ async def generate_text_free(messages: list) -> str:
                 "messages": messages,
                 "model": "openai"
             })
+            content = ""
             if resp.status_code == 200:
-                data = resp.json()
-                if "choices" in data and len(data["choices"]) > 0:
-                    msg = data["choices"][0].get("message", {})
-                    return msg.get("content", str(data))
-            return resp.text
+                try:
+                    data = resp.json()
+                    if "choices" in data and len(data["choices"]) > 0:
+                        msg = data["choices"][0].get("message", {})
+                        content = msg.get("content", str(data))
+                    else:
+                        content = resp.text
+                except:
+                    content = resp.text
+            else:
+                content = resp.text
+            
+            # Remove ad
+            content = content.split("Support Pollinations.AI:")[0]
+            content = content.split("🌸 Ad 🌸")[0]
+            content = content.replace("Powered by Pollinations.AI free text APIs.", "")
+            return content.strip()
     except Exception as e:
         logger.exception("Free text generation failed: %s", e)
         raise e
