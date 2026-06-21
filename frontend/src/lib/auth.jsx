@@ -30,14 +30,14 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
-    localStorage.setItem("vortex_token", r.data.token);
+    localStorage.setItem("Grexo_token", r.data.token);
     setUser(r.data.user);
     return r.data.user;
   };
 
   const signup = async (email, password, name) => {
     const r = await api.post("/auth/signup", { email, password, name });
-    localStorage.setItem("vortex_token", r.data.token);
+    localStorage.setItem("Grexo_token", r.data.token);
     setUser(r.data.user);
     return r.data.user;
   };
@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
     } catch (_e) {
       /* ignore network errors on logout */
     }
-    localStorage.removeItem("vortex_token");
+    localStorage.removeItem("Grexo_token");
     setUser(null);
   };
 

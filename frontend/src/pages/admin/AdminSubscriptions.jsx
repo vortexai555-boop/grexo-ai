@@ -67,7 +67,7 @@ export default function AdminSubscriptions() {
                     <td className="px-4 py-3 font-mono text-xs text-slate-400">{s.user_id}</td>
                     <td className="px-4 py-3 capitalize">{s.plan}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => copy(s.activation_code)} className="font-mono text-vortex-cyan text-xs inline-flex items-center gap-1 hover:text-white">
+                      <button onClick={() => copy(s.activation_code)} className="font-mono text-Grexo-cyan text-xs inline-flex items-center gap-1 hover:text-white">
                         {s.activation_code} <Copy size={11} />
                       </button>
                     </td>

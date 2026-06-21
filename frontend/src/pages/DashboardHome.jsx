@@ -20,7 +20,7 @@ export default function DashboardHome() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <div className="text-mono-accent mb-2">Workspace</div>
           <h1 className="text-4xl lg:text-5xl font-light tracking-tighter">
-            Welcome to <span className="text-gradient-cyan font-medium">VORTEX AI</span>,
+            Welcome to <span className="text-gradient-cyan font-medium">GREXO AI</span>,
           </h1>
           <p className="mt-2 text-slate-400 text-lg" data-testid="dashboard-welcome-name">
             {user?.name || "Creator"}.
@@ -52,7 +52,7 @@ export default function DashboardHome() {
             <ChatCircleDots size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">AI Chat</h3>
             <p className="mt-1 text-slate-400 text-sm">Brainstorm, write, learn — ask Claude Sonnet 4.5 anything.</p>
-            <div className="mt-6 flex items-center gap-2 text-vortex-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open chat <ArrowRight size={16} />
             </div>
           </Link>
@@ -60,7 +60,7 @@ export default function DashboardHome() {
             <Globe size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">Website Builder</h3>
             <p className="mt-1 text-slate-400 text-sm">Describe a site, get production-ready HTML, CSS & JS in seconds.</p>
-            <div className="mt-6 flex items-center gap-2 text-vortex-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open builder <ArrowRight size={16} />
             </div>
           </Link>
@@ -68,7 +68,7 @@ export default function DashboardHome() {
             <ImageIcon size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">Image Generator</h3>
             <p className="mt-1 text-slate-400 text-sm">Turn text into stunning visuals with Gemini Nano Banana.</p>
-            <div className="mt-6 flex items-center gap-2 text-vortex-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open generator <ArrowRight size={16} />
             </div>
           </Link>

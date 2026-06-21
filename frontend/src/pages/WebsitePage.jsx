@@ -129,16 +129,16 @@ export default function WebsitePage() {
   const downloadHtml = () => {
     if (!current?.html) return;
     const blob = new Blob([current.html], { type: "text/html" });
-    saveAs(blob, `vortex-site-${current.id || Date.now()}.html`);
+    saveAs(blob, `Grexo-site-${current.id || Date.now()}.html`);
   };
 
   const downloadZip = async () => {
     if (!current?.html) return;
     const zip = new JSZip();
     zip.file("index.html", current.html);
-    zip.file("README.md", `# VORTEX AI Generated Site\n\nPrompt: ${current.description || description}\nGenerated: ${new Date().toISOString()}\n\n## To preview\nOpen index.html in any browser.\n`);
+    zip.file("README.md", `# GREXO AI Generated Site\n\nPrompt: ${current.description || description}\nGenerated: ${new Date().toISOString()}\n\n## To preview\nOpen index.html in any browser.\n`);
     const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, `vortex-site-${current.id || Date.now()}.zip`);
+    saveAs(blob, `Grexo-site-${current.id || Date.now()}.zip`);
   };
 
   const openHistory = async (item) => {
@@ -152,7 +152,7 @@ export default function WebsitePage() {
         <h1 className="text-4xl font-light tracking-tighter">
           Website <span className="text-gradient-cyan font-medium">Builder</span>
         </h1>
-        <p className="mt-2 text-slate-400">Describe a site. Vortex generates a beautiful, responsive single-page HTML file with Claude Sonnet 4.5.</p>
+        <p className="mt-2 text-slate-400">Describe a site. Grexo generates a beautiful, responsive single-page HTML file with Claude Sonnet 4.5.</p>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-8">
           {/* Input panel */}
@@ -176,7 +176,7 @@ export default function WebsitePage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. A modern landing page for a coffee subscription brand called Brewly..."
-                  className="mt-3 min-h-[140px] pb-12 bg-vortex-elevated border-white/10 focus-visible:ring-vortex-cyan resize-none"
+                  className="mt-3 min-h-[140px] pb-12 bg-Grexo-elevated border-white/10 focus-visible:ring-Grexo-cyan resize-none"
                   data-testid="website-prompt-input"
                 />
                 <div className="absolute left-2 bottom-2">
@@ -189,7 +189,7 @@ export default function WebsitePage() {
               <div className="mt-4">
                 <div className="text-mono-accent mb-2">Site type</div>
                 <Select value={siteType} onValueChange={setSiteType}>
-                  <SelectTrigger className="bg-vortex-elevated border-white/10 h-11" data-testid="website-type-select">
+                  <SelectTrigger className="bg-Grexo-elevated border-white/10 h-11" data-testid="website-type-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -199,7 +199,7 @@ export default function WebsitePage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={generate} disabled={generating || !description.trim()} className="mt-5 w-full h-12 btn-primary-vortex" data-testid="website-generate-btn">
+              <Button onClick={generate} disabled={generating || !description.trim()} className="mt-5 w-full h-12 btn-primary-Grexo" data-testid="website-generate-btn">
                 {generating ? "Generating…" : <><Sparkle size={16} weight="fill" className="mr-2" /> Generate Website</>}
               </Button>
               <div className="mt-3 text-xs text-slate-500">Costs 3 credits per generation.</div>
@@ -227,12 +227,12 @@ export default function WebsitePage() {
             <AnimatePresence mode="wait">
               {generating ? (
                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="glass rounded-2xl p-16 text-center">
-                  <Globe size={48} className="mx-auto text-vortex-cyan animate-vortex-pulse" />
+                  <Globe size={48} className="mx-auto text-Grexo-cyan animate-Grexo-pulse" />
                   <div className="mt-6 text-xl">Crafting your website…</div>
                   <div className="mt-2 text-slate-500 text-sm">Generating layout, design and content with Claude.</div>
                   <div className="mt-6 flex items-center justify-center gap-1.5">
                     {[0, 1, 2, 3, 4].map((i) => (
-                      <span key={i} className="w-1.5 h-6 bg-vortex-cyan/40 rounded animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+                      <span key={i} className="w-1.5 h-6 bg-Grexo-cyan/40 rounded animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
                     ))}
                   </div>
                 </motion.div>
@@ -241,18 +241,18 @@ export default function WebsitePage() {
                   <div className="glass rounded-2xl p-2">
                     <Tabs defaultValue="preview" className="w-full">
                       <div className="flex items-center justify-between p-3">
-                        <TabsList className="bg-vortex-elevated border border-white/5">
+                        <TabsList className="bg-Grexo-elevated border border-white/5">
                           <TabsTrigger value="preview" data-testid="website-tab-preview"><MonitorPlay size={14} className="mr-2" /> Preview</TabsTrigger>
                           <TabsTrigger value="code" data-testid="website-tab-code"><CodeIcon size={14} className="mr-2" /> Code</TabsTrigger>
                         </TabsList>
                         <div className="flex items-center gap-2">
-                          <Button onClick={generate} variant="outline" size="sm" className="btn-ghost-vortex" data-testid="website-regenerate-btn">
+                          <Button onClick={generate} variant="outline" size="sm" className="btn-ghost-Grexo" data-testid="website-regenerate-btn">
                             <ArrowsClockwise size={14} className="mr-1.5" /> Regenerate
                           </Button>
-                          <Button onClick={copyCode} variant="outline" size="sm" className="btn-ghost-vortex" data-testid="website-copy-btn">
+                          <Button onClick={copyCode} variant="outline" size="sm" className="btn-ghost-Grexo" data-testid="website-copy-btn">
                             <ClipboardText size={14} className="mr-1.5" /> Copy
                           </Button>
-                          <Button onClick={downloadZip} size="sm" className="btn-primary-vortex" data-testid="website-zip-btn">
+                          <Button onClick={downloadZip} size="sm" className="btn-primary-Grexo" data-testid="website-zip-btn">
                             <DownloadSimple size={14} className="mr-1.5" /> ZIP
                           </Button>
                         </div>
@@ -284,7 +284,7 @@ export default function WebsitePage() {
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl p-16 text-center">
-                  <Globe size={48} className="mx-auto text-vortex-cyan opacity-60" />
+                  <Globe size={48} className="mx-auto text-Grexo-cyan opacity-60" />
                   <div className="mt-6 text-xl font-light">No website yet</div>
                   <div className="mt-2 text-slate-500 text-sm">Describe what you want on the left and hit Generate.</div>
                 </motion.div>

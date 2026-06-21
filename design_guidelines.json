@@ -53,12 +53,12 @@
   },
   "layout": {
     "landing_page": {
-      "hero": "Full height (min-h-screen). Centered massive text H1. Background image 'hero_vortex' with bg-black/60 overlay to ensure text contrast. Crystal glass nav fixed at top.",
+      "hero": "Full height (min-h-screen). Centered massive text H1. Background image 'hero_Grexo' with bg-black/60 overlay to ensure text contrast. Crystal glass nav fixed at top.",
       "features": "Bento Grid ('Tetris' mode). grid-cols-1 md:grid-cols-12 gap-8. Direct motion.div children. Mix of span-8 hero feature, span-4 squares.",
       "pricing": "3-tier glass cards. Use the 'Tracing Beam' or subtle neon border-glow on the Pro/Enterprise tier.",
       "testimonials": "Horizontal scroll / marquee with 'Editorial Ribbon' slow scroll speed. Low contrast cards.",
       "faq": "Shadcn accordion centered, max-w-3xl.",
-      "footer": "Massive py-32 spacing. Darkest background (#030305). Huge 10vw VORTEX text at the bottom."
+      "footer": "Massive py-32 spacing. Darkest background (#030305). Huge 10vw Grexo text at the bottom."
     },
     "dashboard": {
       "structure": "Control Room Grid. Strict grid-cols-12 layout. Dense gap-4 or gap-6. Sidebar is #0A0A12, Main content area is #030305.",
@@ -88,7 +88,7 @@
       "partner_1": "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGJsdWUlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODA3Mjk3OTd8MA&ixlib=rb-4.1.0&q=85"
     },
     "backgrounds": {
-      "hero_vortex": "https://images.pexels.com/photos/12707786/pexels-photo-12707786.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "hero_Grexo": "https://images.pexels.com/photos/12707786/pexels-photo-12707786.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
       "abstract_art": "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGJsdWUlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODA3Mjk3OTd8MA&ixlib=rb-4.1.0&q=85"
     },
     "testimonials": {
@@ -107,7 +107,7 @@
     "Dashboard cards should avoid flat default appearance - use subtle 1px border-white/5 and dark background #0A0A12.",
     "Never use dummyimage.com or via.placeholder.com. Use the exact URLs provided in the media section of this JSON.",
     "For Code Output components, ensure proper terminal styling (dark background, monospaced font, colored syntax mimicking VS Code dark theme).",
-    "Landing page hero must use the provided vortex image URL as background with a dark overlay, and feature the brand logo prominently.",
+    "Landing page hero must use the provided Grexo image URL as background with a dark overlay, and feature the brand logo prominently.",
     "Admin Panel and Dashboard Analytics should use Recharts or Shadcn Charts with Electric Blue and Deep Purple strokes."
   ]
 }

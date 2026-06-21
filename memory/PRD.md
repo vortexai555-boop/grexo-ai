@@ -1,7 +1,7 @@
-# VORTEX AI - Product Requirements Document
+# GREXO AI - Product Requirements Document
 
 ## Original Problem Statement
-Build a production-ready MVP for a SaaS platform called VORTEX AI. Core needs:
+Build a production-ready MVP for a SaaS platform called GREXO AI. Core needs:
 - Authentication (Google OAuth + Email/Password)
 - Dashboard (welcome message, sidebar: AI Chat / Profile / Settings)
 - AI Chat system (ChatGPT-style, persisted history per user)
@@ -31,7 +31,7 @@ Build a production-ready MVP for a SaaS platform called VORTEX AI. Core needs:
 - Settings page: appearance, notifications, logout, feedback link
 - Protected routes via `ProtectedRoute` + `AuthProvider`
 - Per-user isolation on all conversation endpoints (verified via testing agent)
-- Admin seeding on backend startup (`admin@vortex.ai` / `VortexAdmin@2026`)
+- Admin seeding on backend startup (`admin@Grexo.ai` / `GrexoAdmin@2026`)
 
 ## Backlog (future)
 - **P1**: Add streaming responses for chat (currently uses `send_message`); reduces UX wait
@@ -52,4 +52,4 @@ Stored in `/app/memory/test_credentials.md`.
 - `/app/frontend/src/App.js` — routes
 - `/app/frontend/src/lib/{api.js, auth.jsx}` — API client + auth context
 - `/app/frontend/src/pages/{Landing, Login, Signup, Forgot, AuthCallback, DashboardLayout, DashboardHome, ChatPage, ProfilePage, SettingsPage}.jsx`
-- `/app/backend/tests/test_vortex_api.py` — pytest baseline (21/21 passing)
+- `/app/backend/tests/test_Grexo_api.py` — pytest baseline (21/21 passing)

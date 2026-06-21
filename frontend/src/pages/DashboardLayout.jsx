@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import VortexLogo from "@/components/VortexLogo";
+import GrexoLogo from "@/components/GrexoLogo";
 import { Button } from "@/components/ui/button";
 import { 
   ChatCircleDots, House, User, Gear, SignOut, 
@@ -30,9 +30,9 @@ export default function DashboardLayout() {
   };
 
   const SidebarInner = (
-    <aside className="h-full w-64 bg-vortex-surface border-r border-white/5 flex flex-col">
+    <aside className="h-full w-64 bg-Grexo-surface border-r border-white/5 flex flex-col">
       <div className="p-5 border-b border-white/5">
-        <VortexLogo size={32} />
+        <GrexoLogo size={32} />
       </div>
       <nav className="flex-1 p-4 space-y-1">
         {NAV.map((item) => (
@@ -64,7 +64,7 @@ export default function DashboardLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
                   isActive
-                    ? "bg-vortex-cyan/10 text-vortex-cyan border border-vortex-cyan/30"
+                    ? "bg-Grexo-cyan/10 text-Grexo-cyan border border-Grexo-cyan/30"
                     : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
                 }`
               }
@@ -81,7 +81,7 @@ export default function DashboardLayout() {
           <div className="mt-1 text-xs text-slate-500 capitalize">{user?.plan || "free"} plan</div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-vortex-cyan/30 to-vortex-purple/30 flex items-center justify-center text-sm font-medium">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-Grexo-cyan/30 to-Grexo-purple/30 flex items-center justify-center text-sm font-medium">
             {user?.picture ? <img src={user.picture} alt="" className="w-full h-full rounded-full object-cover" /> : (user?.name || "?").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -97,7 +97,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex h-full bg-vortex-bg text-white overflow-hidden">
+    <div className="flex h-full bg-Grexo-bg text-white overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden md:block">{SidebarInner}</div>
       {/* Mobile sidebar */}
@@ -108,11 +108,11 @@ export default function DashboardLayout() {
         </div>
       )}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/5 bg-vortex-surface">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/5 bg-Grexo-surface">
           <Button variant="ghost" size="icon" onClick={() => setOpen(true)} data-testid="open-sidebar">
             <List size={20} />
           </Button>
-          <VortexLogo size={28} />
+          <GrexoLogo size={28} />
           <div className="w-9" />
         </header>
         <main className="flex-1 overflow-hidden">

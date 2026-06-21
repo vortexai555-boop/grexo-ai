@@ -1,4 +1,4 @@
-"""VORTEX AI - End-to-end API tests."""
+"""GREXO AI - End-to-end API tests."""
 import os
 import uuid
 import time
@@ -17,8 +17,8 @@ if not BASE_URL:
 BASE_URL = BASE_URL.rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@vortex.ai"
-ADMIN_PASSWORD = "VortexAdmin@2026"
+ADMIN_EMAIL = "admin@Grexo.ai"
+ADMIN_PASSWORD = "GrexoAdmin@2026"
 
 
 # ---- Fixtures ----
@@ -32,7 +32,7 @@ def admin_token():
 @pytest.fixture(scope="session")
 def user_a():
     # Unique signup
-    email = f"test_userA_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+    email = f"test_userA_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
     r = requests.post(f"{API}/auth/signup", json={"email": email, "password": "PassAA@2026", "name": "Alice"}, timeout=20)
     assert r.status_code == 200, r.text
     return {"email": email, "token": r.json()["token"], "user": r.json()["user"]}
@@ -40,7 +40,7 @@ def user_a():
 
 @pytest.fixture(scope="session")
 def user_b():
-    email = f"test_userB_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+    email = f"test_userB_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
     r = requests.post(f"{API}/auth/signup", json={"email": email, "password": "PassBB@2026", "name": "Bob"}, timeout=20)
     assert r.status_code == 200, r.text
     return {"email": email, "token": r.json()["token"], "user": r.json()["user"]}
@@ -94,7 +94,7 @@ class TestAuth:
 # ---- Forgot/Reset ----
 class TestForgotReset:
     def test_forgot_reset_flow(self):
-        email = f"test_reset_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+        email = f"test_reset_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
         old_pw = "OldPass@2026"
         new_pw = "NewPass@2026"
         # signup
@@ -122,7 +122,7 @@ class TestForgotReset:
         assert r.status_code == 200
 
     def test_forgot_unknown_email_silent(self):
-        r = requests.post(f"{API}/auth/forgot", json={"email": "nonexistent@vortex-ai.com"}, timeout=10)
+        r = requests.post(f"{API}/auth/forgot", json={"email": "nonexistent@Grexo-AI.com"}, timeout=10)
         assert r.status_code == 200
         # No reset_token leaked when user doesn't exist
         assert "reset_token" not in r.json()
@@ -246,7 +246,7 @@ class TestDashboard:
 class TestLogout:
     def test_logout(self):
         # Create temp user, login, logout
-        email = f"test_logout_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+        email = f"test_logout_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
         r = requests.post(f"{API}/auth/signup", json={"email": email, "password": "Pw@2026!!", "name": "Lo"}, timeout=10)
         token = r.json()["token"]
         r = requests.post(f"{API}/auth/logout", headers=auth_headers(token), timeout=10)

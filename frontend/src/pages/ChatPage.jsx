@@ -11,7 +11,7 @@ import Markdown from "@/components/Markdown";
 import {
   PaperPlaneRight, Plus, Trash, PencilSimple, DownloadSimple, ChatCircleDots, Sparkle, Copy, Check, Globe, PlusCircle, X
 } from "@phosphor-icons/react";
-import VortexLogo from "@/components/VortexLogo";
+import GrexoLogo from "@/components/GrexoLogo";
 
 export default function ChatPage() {
   const { cid } = useParams();
@@ -193,9 +193,9 @@ useEffect(() => {
   return (
     <div className="flex h-full">
       {/* Chat list panel */}
-      <aside className="hidden lg:flex w-72 border-r border-white/5 bg-vortex-surface/50 flex-col">
+      <aside className="hidden lg:flex w-72 border-r border-white/5 bg-Grexo-surface/50 flex-col">
         <div className="p-4 border-b border-white/5">
-          <Button onClick={newChat} className="w-full btn-primary-vortex" data-testid="new-chat-btn">
+          <Button onClick={newChat} className="w-full btn-primary-Grexo" data-testid="new-chat-btn">
             <Plus size={16} className="mr-2" /> New chat
           </Button>
         </div>
@@ -219,7 +219,7 @@ useEffect(() => {
                     onChange={(e) => setRenameVal(e.target.value)}
                     onBlur={() => saveRename(c.id)}
                     onKeyDown={(e) => { if (e.key === "Enter") saveRename(c.id); if (e.key === "Escape") setRenaming(null); }}
-                    className="h-8 bg-vortex-elevated border-white/20"
+                    className="h-8 bg-Grexo-elevated border-white/20"
                     data-testid={`conv-rename-input-${c.id}`}
                   />
                 ) : (
@@ -243,7 +243,7 @@ useEffect(() => {
 
       {/* Main chat area */}
       <section className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-vortex-surface/30">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-Grexo-surface/30">
           <div className="flex items-center gap-3 min-w-0">
             <ChatCircleDots size={20} color="#00F0FF" />
             <div className="text-sm truncate" data-testid="chat-title">{current?.title || "New chat"}</div>
@@ -264,8 +264,8 @@ useEffect(() => {
           <div className="max-w-3xl mx-auto px-6 py-8">
             {!current?.messages?.length && (
               <div className="text-center py-16">
-                <div className="flex justify-center mb-6"><VortexLogo size={56} withText={false} /></div>
-                <h2 className="text-3xl font-light tracking-tight">How can <span className="text-gradient-cyan">VORTEX</span> help today?</h2>
+                <div className="flex justify-center mb-6"><GrexoLogo size={56} withText={false} /></div>
+                <h2 className="text-3xl font-light tracking-tight">How can <span className="text-gradient-cyan">Grexo</span> help today?</h2>
                 <p className="mt-3 text-slate-400">Ask anything. Brainstorm, debug, plan, write — start with a prompt below.</p>
                 <div className="mt-8 grid sm:grid-cols-2 gap-3 max-w-xl mx-auto">
                   {[
@@ -280,7 +280,7 @@ useEffect(() => {
                       className="glass rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:border-white/20 hover:-translate-y-0.5 transition"
                       data-testid={`prompt-suggestion-${i}`}
                     >
-                      <Sparkle size={14} className="inline mr-2 text-vortex-cyan" /> {s}
+                      <Sparkle size={14} className="inline mr-2 text-Grexo-cyan" /> {s}
                     </button>
                   ))}
                 </div>
@@ -298,17 +298,17 @@ useEffect(() => {
                 >
                   {m.role === "assistant" && (
                     <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0">
-                      <VortexLogo size={32} withText={false} />
+                      <GrexoLogo size={32} withText={false} />
                     </div>
                   )}
-                  <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-vortex-navy text-white border border-vortex-cyan/20" : "glass text-slate-100"} group relative`}>
+                  <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-Grexo-navy text-white border border-Grexo-cyan/20" : "glass text-slate-100"} group relative`}>
                     {m.role === "assistant" && (
                       <button
                         onClick={() => handleCopy(m.content, i)}
                         className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 rounded p-1.5"
                         title="Copy message"
                       >
-                        {copiedIndex === i ? <Check size={16} weight="bold" className="text-vortex-cyan" /> : <Copy size={16} />}
+                        {copiedIndex === i ? <Check size={16} weight="bold" className="text-Grexo-cyan" /> : <Copy size={16} />}
                       </button>
                     )}
                     {m.role === "assistant" ? <Markdown source={m.content} /> : <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>}
@@ -319,19 +319,19 @@ useEffect(() => {
 
             {sending && (
               <div className="flex items-center gap-3 text-slate-400 text-sm">
-                <div className="w-8 h-8 rounded-full overflow-hidden"><VortexLogo size={32} withText={false} /></div>
+                <div className="w-8 h-8 rounded-full overflow-hidden"><GrexoLogo size={32} withText={false} /></div>
                 <div className="glass rounded-2xl px-5 py-3 flex items-center gap-2" data-testid="chat-loading">
-                  <span className="w-1.5 h-1.5 rounded-full bg-vortex-cyan animate-pulse" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-vortex-cyan animate-pulse" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-vortex-cyan animate-pulse" style={{ animationDelay: "300ms" }} />
-                  <span className="ml-2 text-xs">VORTEX is thinking…</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" style={{ animationDelay: "300ms" }} />
+                  <span className="ml-2 text-xs">Grexo is thinking…</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <form onSubmit={send} className="border-t border-white/5 bg-vortex-surface/40 p-4">
+        <form onSubmit={send} className="border-t border-white/5 bg-Grexo-surface/40 p-4">
           <div className="max-w-3xl mx-auto">
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
@@ -354,7 +354,7 @@ useEffect(() => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e); } }}
-                placeholder="Message VORTEX AI…"
+                placeholder="Message GREXO AI…"
                 rows={1}
                 className="min-h-[44px] max-h-40 resize-none bg-transparent border-0 focus-visible:ring-0 text-base placeholder:text-slate-500"
                 data-testid="chat-input"
@@ -363,16 +363,16 @@ useEffect(() => {
                 type="button"
                 variant="ghost"
                 onClick={() => setWebSearch(!webSearch)}
-                className={`h-11 px-3 mt-auto ${webSearch ? 'text-vortex-cyan bg-vortex-cyan/10' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`h-11 px-3 mt-auto ${webSearch ? 'text-Grexo-cyan bg-Grexo-cyan/10' : 'text-slate-500 hover:text-slate-300'}`}
                 title="Toggle Web Search"
               >
                 <Globe size={20} weight={webSearch ? "fill" : "regular"} />
               </Button>
-              <Button type="submit" disabled={sending || !input.trim()} className="btn-primary-vortex h-11 px-5" data-testid="chat-send">
+              <Button type="submit" disabled={sending || !input.trim()} className="btn-primary-Grexo h-11 px-5" data-testid="chat-send">
                 <PaperPlaneRight size={16} weight="fill" />
               </Button>
             </div>
-            <div className="mt-2 text-[11px] text-slate-500 text-center">Vortex can make mistakes. Verify important info.</div>
+            <div className="mt-2 text-[11px] text-slate-500 text-center">Grexo can make mistakes. Verify important info.</div>
           </div>
         </form>
       </section>

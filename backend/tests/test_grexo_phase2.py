@@ -1,4 +1,4 @@
-"""VORTEX AI Phase 2 - Website Builder + Image Generator API tests."""
+"""GREXO AI Phase 2 - Website Builder + Image Generator API tests."""
 import os
 import time
 import uuid
@@ -16,8 +16,8 @@ if not BASE_URL:
 BASE_URL = BASE_URL.rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@vortex.ai"
-ADMIN_PASSWORD = "VortexAdmin@2026"
+ADMIN_EMAIL = "admin@Grexo.ai"
+ADMIN_PASSWORD = "GrexoAdmin@2026"
 
 
 # ---- Fixtures ----
@@ -34,7 +34,7 @@ def admin_token():
 
 @pytest.fixture(scope="module")
 def user_a():
-    email = f"test_p2_userA_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+    email = f"test_p2_userA_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
     r = requests.post(f"{API}/auth/signup", json={"email": email, "password": "PassAA@2026", "name": "Alice2"}, timeout=20)
     assert r.status_code == 200, r.text
     return {"email": email, "token": r.json()["token"], "user": r.json()["user"]}
@@ -42,7 +42,7 @@ def user_a():
 
 @pytest.fixture(scope="module")
 def user_b():
-    email = f"test_p2_userB_{uuid.uuid4().hex[:8]}@vortex-ai.com"
+    email = f"test_p2_userB_{uuid.uuid4().hex[:8]}@Grexo-AI.com"
     r = requests.post(f"{API}/auth/signup", json={"email": email, "password": "PassBB@2026", "name": "Bob2"}, timeout=20)
     assert r.status_code == 200, r.text
     return {"email": email, "token": r.json()["token"], "user": r.json()["user"]}

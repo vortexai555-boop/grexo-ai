@@ -5,7 +5,7 @@ import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
-// react-day-picker v9 API. Note: VORTEX AI does not currently use Calendar
+// react-day-picker v9 API. Note: GREXO AI does not currently use Calendar
 // at runtime — this file exists only for shadcn/ui completeness.
 function Calendar({
   className,

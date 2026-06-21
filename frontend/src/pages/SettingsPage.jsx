@@ -22,7 +22,7 @@ export default function SettingsPage() {
         <h1 className="text-4xl font-light tracking-tight">Settings</h1>
 
         <div className="mt-8 space-y-4">
-          <Row title="Appearance" desc="Vortex uses a futuristic dark theme by default. Light mode coming soon.">
+          <Row title="Appearance" desc="Grexo uses a futuristic dark theme by default. Light mode coming soon.">
             <div className="flex items-center gap-3">
               <span className="text-sm text-slate-400">Dark</span>
               <Switch checked disabled data-testid="setting-theme-toggle" />
@@ -34,12 +34,12 @@ export default function SettingsPage() {
           </Row>
 
           <Row title="Account" desc={`Signed in as ${user?.email}.`}>
-            <Button onClick={handleLogout} variant="outline" className="btn-ghost-vortex" data-testid="setting-logout">Sign out</Button>
+            <Button onClick={handleLogout} variant="outline" className="btn-ghost-Grexo" data-testid="setting-logout">Sign out</Button>
           </Row>
 
-          <Row title="Feedback" desc="Help us shape Vortex. Send feedback to the team.">
-            <a href="mailto:hello@vortex.ai" className="text-vortex-cyan hover:underline text-sm" data-testid="setting-feedback-link">
-              hello@vortex.ai
+          <Row title="Feedback" desc="Help us shape Grexo. Send feedback to the team.">
+            <a href="mailto:hello@Grexo.ai" className="text-Grexo-cyan hover:underline text-sm" data-testid="setting-feedback-link">
+              hello@Grexo.ai
             </a>
           </Row>
         </div>

@@ -27,7 +27,7 @@ module.exports = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        vortex: {
+        Grexo: {
           bg: "#030305",
           surface: "#0A0A12",
           elevated: "#12121D",
@@ -40,7 +40,7 @@ module.exports = {
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
-        "vortex-pulse": {
+        "Grexo-pulse": {
           "0%, 100%": { opacity: "0.5", transform: "scale(1)" },
           "50%": { opacity: "1", transform: "scale(1.05)" },
         },
@@ -56,7 +56,7 @@ module.exports = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "vortex-pulse": "vortex-pulse 4s ease-in-out infinite",
+        "Grexo-pulse": "Grexo-pulse 4s ease-in-out infinite",
         "shimmer": "shimmer 3s linear infinite",
         "float": "float 6s ease-in-out infinite",
       },

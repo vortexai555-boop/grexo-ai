@@ -7,8 +7,8 @@ export default function ProtectedRoute({ children, requireAdmin = false }) {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vortex-bg">
-        <div className="text-mono-accent">Loading vortex...</div>
+      <div className="min-h-screen flex items-center justify-center bg-Grexo-bg">
+        <div className="text-mono-accent">Loading Grexo...</div>
       </div>
     );
   }

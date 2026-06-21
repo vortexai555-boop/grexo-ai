@@ -20,7 +20,7 @@ export default function ProfilePage() {
 
         <div className="mt-8 glass rounded-2xl p-8">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-vortex-cyan/30 to-vortex-purple/30 flex items-center justify-center text-2xl font-light overflow-hidden">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-Grexo-cyan/30 to-Grexo-purple/30 flex items-center justify-center text-2xl font-light overflow-hidden">
               {user.picture ? <img src={user.picture} alt="" className="w-full h-full object-cover" /> : (user.name || "?").charAt(0).toUpperCase()}
             </div>
             <div>
@@ -62,7 +62,7 @@ export default function ProfilePage() {
 
 function Field({ label, children }) {
   return (
-    <div className="bg-vortex-elevated border border-white/5 rounded-xl p-4">
+    <div className="bg-Grexo-elevated border border-white/5 rounded-xl p-4">
       <div className="text-mono-accent mb-2">{label}</div>
       {children}
     </div>

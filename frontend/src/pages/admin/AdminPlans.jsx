@@ -85,7 +85,7 @@ export default function AdminPlans() {
             setAdding(true); setEditing(null); setError("");
             setForm({ id: "", name: "", price: 0, currency: "USD", credits: 0, purchasable: true, features: "" });
           }}
-          className="flex items-center gap-2 px-3 py-1.5 bg-vortex-cyan text-black rounded hover:opacity-90 transition text-sm font-medium"
+          className="flex items-center gap-2 px-3 py-1.5 bg-Grexo-cyan text-black rounded hover:opacity-90 transition text-sm font-medium"
         >
           <Plus /> Add Plan
         </button>
@@ -163,7 +163,7 @@ export default function AdminPlans() {
             </div>
 
             <div className="flex items-center gap-3 pt-2">
-              <button type="submit" className="px-4 py-2 bg-vortex-cyan text-black rounded text-sm font-medium hover:opacity-90">
+              <button type="submit" className="px-4 py-2 bg-Grexo-cyan text-black rounded text-sm font-medium hover:opacity-90">
                 Save Plan
               </button>
               <button type="button" onClick={() => { setAdding(false); setEditing(null); }} className="px-4 py-2 hover:bg-white/5 rounded text-sm transition">
@@ -183,7 +183,7 @@ export default function AdminPlans() {
                 <button onClick={() => handleDelete(p.id)} className="p-1.5 hover:text-red-400 text-slate-400 transition"><Trash size={16} /></button>
               )}
             </div>
-            <div className="text-xs text-vortex-cyan/80 font-mono mb-1">{p.id}</div>
+            <div className="text-xs text-Grexo-cyan/80 font-mono mb-1">{p.id}</div>
             <h3 className="text-2xl font-light">{p.name}</h3>
             <div className="mt-2 flex items-end gap-2">
               <span className="text-3xl">{p.currency === "INR" ? "₹" : "$"}{p.price}</span>
@@ -194,7 +194,7 @@ export default function AdminPlans() {
             <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
                {p.features?.map((f, i) => (
                  <div key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                   <CheckCircle className="text-vortex-cyan shrink-0 mt-0.5" />
+                   <CheckCircle className="text-Grexo-cyan shrink-0 mt-0.5" />
                    <span>{f}</span>
                  </div>
                ))}

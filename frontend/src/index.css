@@ -56,13 +56,13 @@
   code, pre { font-family: "JetBrains Mono", ui-monospace, monospace; }
 }
 
-/* Vortex background grain + glow utilities */
-.vortex-grain {
+/* Grexo background grain + glow utilities */
+.Grexo-grain {
   background-image: radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 4px 4px;
 }
 
-.vortex-grid-bg {
+.Grexo-grid-bg {
   background-image:
     linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
@@ -101,26 +101,26 @@
   color: #00F0FF;
 }
 
-.btn-primary-vortex {
+.btn-primary-Grexo {
   background: #00F0FF;
   color: #000;
   font-weight: 600;
   transition: all 0.2s ease;
   box-shadow: 0 0 18px rgba(0, 240, 255, 0.28);
 }
-.btn-primary-vortex:hover {
+.btn-primary-Grexo:hover {
   background: #E0FFFF;
   box-shadow: 0 0 30px rgba(0, 240, 255, 0.55);
   transform: translateY(-1px);
 }
 
-.btn-ghost-vortex {
+.btn-ghost-Grexo {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
   transition: all 0.2s ease;
 }
-.btn-ghost-vortex:hover {
+.btn-ghost-Grexo:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
 }

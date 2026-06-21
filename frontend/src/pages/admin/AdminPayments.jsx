@@ -76,7 +76,7 @@ export default function AdminPayments() {
   return (
     <div data-testid="admin-payments-page">
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-vortex-elevated border border-white/5">
+        <TabsList className="bg-Grexo-elevated border border-white/5">
           <TabsTrigger value="pending" data-testid="admin-payments-tab-pending">Pending ({counts.pending})</TabsTrigger>
           <TabsTrigger value="approved" data-testid="admin-payments-tab-approved">Approved ({counts.approved})</TabsTrigger>
           <TabsTrigger value="rejected" data-testid="admin-payments-tab-rejected">Rejected ({counts.rejected})</TabsTrigger>
@@ -122,7 +122,7 @@ export default function AdminPayments() {
                           {p.activation_code && (
                             <button
                               onClick={() => copyCode(p.activation_code)}
-                              className="mt-1.5 flex items-center gap-1 text-[11px] text-vortex-cyan font-mono hover:text-white"
+                              className="mt-1.5 flex items-center gap-1 text-[11px] text-Grexo-cyan font-mono hover:text-white"
                               data-testid={`admin-payment-code-${p.id}`}
                             >
                               {p.activation_code} <Copy size={11} />
@@ -132,10 +132,10 @@ export default function AdminPayments() {
                         <td className="px-4 py-3 text-right">
                           {p.status === "pending" ? (
                             <div className="inline-flex gap-2">
-                              <Button size="sm" onClick={() => approve(p)} disabled={busyId === p.id} className="btn-primary-vortex h-8" data-testid={`admin-payment-approve-${p.id}`}>
+                              <Button size="sm" onClick={() => approve(p)} disabled={busyId === p.id} className="btn-primary-Grexo h-8" data-testid={`admin-payment-approve-${p.id}`}>
                                 Approve
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => reject(p)} disabled={busyId === p.id} className="btn-ghost-vortex h-8" data-testid={`admin-payment-reject-${p.id}`}>
+                              <Button size="sm" variant="outline" onClick={() => reject(p)} disabled={busyId === p.id} className="btn-ghost-Grexo h-8" data-testid={`admin-payment-reject-${p.id}`}>
                                 Reject
                               </Button>
                             </div>

@@ -1,4 +1,4 @@
-"""VORTEX AI - Premium AI SaaS Platform Backend."""
+"""GREXO AI - Premium AI SaaS Platform Backend."""
 
 import os
 import uuid
@@ -38,8 +38,8 @@ db = client[os.environ["DB_NAME"]]
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
 JWT_ALG = os.environ.get("JWT_ALG", "HS256")
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@vortex.ai")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "VortexAdmin@2026")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@Grexo.ai")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "GrexoAdmin@2026")
 
 FREE_CREDITS = 100
 PRO_CREDITS = 2000
@@ -48,7 +48,7 @@ ENTERPRISE_CREDITS = 99999
 CHAT_MODEL = ("anthropic", "claude-sonnet-4-5-20250929")
 IMAGE_MODEL = "imagen-4.0-fast-generate-001"
 
-app = FastAPI(title="VORTEX AI")
+app = FastAPI(title="GREXO AI")
 api = APIRouter(prefix="/api")
 
 
@@ -400,11 +400,11 @@ async def logout(response: Response, authorization: Optional[str] = Header(None)
 
 
 SYSTEM_PROMPTS = {
-    "chat": "You are VORTEX AI Assistant — a brilliant, friendly, helpful AI. Be concise, clear, and impressive.",
-    "code": "You are VORTEX Code — an expert software engineer. Return clean, production-ready code in fenced markdown code blocks and brief explanations.",
-    "content": "You are VORTEX Content — a world-class copywriter and SEO expert. Produce engaging, well-formatted content.",
-    "business": "You are VORTEX Business — a senior business consultant. Produce structured, actionable, market-aware strategies.",
-    "website": "You are VORTEX Web — an expert frontend engineer. When asked, output a SINGLE complete HTML file with inline CSS+JS in a ```html code block.",
+    "chat": "You are GREXO AI Assistant — a brilliant, friendly, helpful AI. Be concise, clear, and impressive.",
+    "code": "You are Grexo Code — an expert software engineer. Return clean, production-ready code in fenced markdown code blocks and brief explanations.",
+    "content": "You are Grexo Content — a world-class copywriter and SEO expert. Produce engaging, well-formatted content.",
+    "business": "You are Grexo Business — a senior business consultant. Produce structured, actionable, market-aware strategies.",
+    "website": "You are Grexo Web — an expert frontend engineer. When asked, output a SINGLE complete HTML file with inline CSS+JS in a ```html code block.",
     "calculator": "Calculator"
 }
 
@@ -1303,7 +1303,7 @@ async def admin_audit(_admin=Depends(require_admin)):
 
 
 @api.get("/")
-async def root(): return {"app": "VORTEX AI", "ok": True}
+async def root(): return {"app": "GREXO AI", "ok": True}
 
 
 @app.on_event("startup")
@@ -1311,7 +1311,7 @@ async def seed_admin():
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()}, {"_id": 0})
     if not existing:
         await db.users.insert_one({
-            "user_id": new_id("user"), "email": ADMIN_EMAIL.lower(), "name": "Vortex Admin",
+            "user_id": new_id("user"), "email": ADMIN_EMAIL.lower(), "name": "Grexo Admin",
             "password_hash": hash_pw(ADMIN_PASSWORD), "picture": None, "plan": "enterprise",
             "credits": ENTERPRISE_CREDITS, "role": "admin", "provider": "jwt",
             "created_at": now_utc().isoformat(),

@@ -116,8 +116,8 @@ export default function PaymentPage() {
             className="mt-10 glass-strong rounded-2xl p-10 text-center"
             data-testid="payment-confirmation"
           >
-            <div className="w-16 h-16 rounded-full bg-vortex-cyan/10 border border-vortex-cyan/40 mx-auto flex items-center justify-center">
-              <Check size={28} weight="bold" className="text-vortex-cyan" />
+            <div className="w-16 h-16 rounded-full bg-Grexo-cyan/10 border border-Grexo-cyan/40 mx-auto flex items-center justify-center">
+              <Check size={28} weight="bold" className="text-Grexo-cyan" />
             </div>
             <h2 className="mt-6 text-2xl font-medium">Payment submitted</h2>
             <p className="mt-2 text-slate-400 max-w-md mx-auto">
@@ -125,10 +125,10 @@ export default function PaymentPage() {
             </p>
             <div className="mt-6 text-xs text-slate-500">Reference ID: <span className="font-mono">{submitted.id}</span></div>
             <div className="mt-8 flex items-center justify-center gap-3">
-              <Button onClick={() => navigate("/dashboard/billing")} className="btn-primary-vortex" data-testid="payment-back-to-billing">
+              <Button onClick={() => navigate("/dashboard/billing")} className="btn-primary-Grexo" data-testid="payment-back-to-billing">
                 Back to billing
               </Button>
-              <Button variant="outline" onClick={() => { setSubmitted(null); setForm({ ...form, utr_number: "" }); }} className="btn-ghost-vortex" data-testid="payment-submit-another">
+              <Button variant="outline" onClick={() => { setSubmitted(null); setForm({ ...form, utr_number: "" }); }} className="btn-ghost-Grexo" data-testid="payment-submit-another">
                 Submit another
               </Button>
             </div>
@@ -182,22 +182,22 @@ export default function PaymentPage() {
 
               <div>
                 <Label className="text-slate-300 text-xs uppercase tracking-widest">Full name</Label>
-                <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-2 h-11 bg-vortex-elevated border-white/10" data-testid="payment-input-name" />
+                <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-2 h-11 bg-Grexo-elevated border-white/10" data-testid="payment-input-name" />
               </div>
               <div>
                 <Label className="text-slate-300 text-xs uppercase tracking-widest">Email</Label>
-                <Input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-2 h-11 bg-vortex-elevated border-white/10" data-testid="payment-input-email" />
+                <Input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-2 h-11 bg-Grexo-elevated border-white/10" data-testid="payment-input-email" />
               </div>
               <div>
                 <Label className="text-slate-300 text-xs uppercase tracking-widest">UTR / Transaction ID</Label>
-                <Input required value={form.utr_number} onChange={(e) => setForm({ ...form, utr_number: e.target.value })} placeholder="e.g. 414218023765" className="mt-2 h-11 bg-vortex-elevated border-white/10 font-mono" data-testid="payment-input-utr" />
+                <Input required value={form.utr_number} onChange={(e) => setForm({ ...form, utr_number: e.target.value })} placeholder="e.g. 414218023765" className="mt-2 h-11 bg-Grexo-elevated border-white/10 font-mono" data-testid="payment-input-utr" />
                 <div className="mt-1.5 text-xs text-slate-500">From your bank/UPI app after the transfer is complete.</div>
               </div>
-              <Button type="submit" disabled={submitting} className="w-full h-12 btn-primary-vortex" data-testid="payment-submit-btn">
+              <Button type="submit" disabled={submitting} className="w-full h-12 btn-primary-Grexo" data-testid="payment-submit-btn">
                 {submitting ? "Submitting…" : "Submit for verification"}
               </Button>
               <div className="flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-white/5">
-                <ShieldCheck size={14} className="text-vortex-cyan" />
+                <ShieldCheck size={14} className="text-Grexo-cyan" />
                 Your details are encrypted in transit and only visible to the admin.
               </div>
             </form>

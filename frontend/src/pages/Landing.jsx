@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import VortexLogo from "@/components/VortexLogo";
+import GrexoLogo from "@/components/GrexoLogo";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Marquee from "react-fast-marquee";
@@ -26,21 +26,21 @@ const features = [
 ];
 
 const testimonials = [
-  { name: "Maya Chen", role: "Founder, Pixelweave", quote: "VORTEX is the assistant I actually open every morning. Fast, clean, and honest answers.", avatar: AVATARS[1] },
-  { name: "Daniel Park", role: "CTO, Northgate", quote: "We replaced three AI tools with VORTEX. The interface is in a class of its own.", avatar: AVATARS[0] },
+  { name: "Maya Chen", role: "Founder, Pixelweave", quote: "Grexo is the assistant I actually open every morning. Fast, clean, and honest answers.", avatar: AVATARS[1] },
+  { name: "Daniel Park", role: "CTO, Northgate", quote: "We replaced three AI tools with Grexo. The interface is in a class of its own.", avatar: AVATARS[0] },
   { name: "Aisha Khan", role: "Product Designer", quote: "The dark aesthetic alone is worth the upgrade. It feels like flying through ideas.", avatar: AVATARS[2] },
-  { name: "Rafael Souza", role: "Indie hacker", quote: "I built my entire weekend project with VORTEX. The chat is genuinely thoughtful.", avatar: AVATARS[0] },
+  { name: "Rafael Souza", role: "Indie hacker", quote: "I built my entire weekend project with Grexo. The chat is genuinely thoughtful.", avatar: AVATARS[0] },
 ];
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-vortex-bg text-white relative overflow-hidden">
-      <div className="vortex-grain absolute inset-0 opacity-30 pointer-events-none" />
+    <div className="min-h-screen bg-Grexo-bg text-white relative overflow-hidden">
+      <div className="Grexo-grain absolute inset-0 opacity-30 pointer-events-none" />
 
       {/* NAV */}
       <header className="fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <VortexLogo />
+          <GrexoLogo />
           <nav className="hidden md:flex items-center gap-8 text-sm text-slate-300">
             <a href="#features" className="hover:text-white transition" data-testid="nav-features">Features</a>
             <a href="#pricing" className="hover:text-white transition" data-testid="nav-pricing">Pricing</a>
@@ -49,7 +49,7 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-3">
             <Link to="/login"><Button variant="ghost" className="text-slate-200 hover:bg-white/5" data-testid="nav-login">Sign in</Button></Link>
-            <Link to="/signup"><Button className="btn-primary-vortex" data-testid="nav-signup">Start Free</Button></Link>
+            <Link to="/signup"><Button className="btn-primary-Grexo" data-testid="nav-signup">Start Free</Button></Link>
           </div>
         </div>
       </header>
@@ -58,7 +58,7 @@ export default function Landing() {
       <section className="relative min-h-screen flex items-center justify-center pt-24">
         <div className="absolute inset-0">
           <img src={HERO_BG} alt="" className="w-full h-full object-cover opacity-25" />
-          <div className="absolute inset-0 bg-gradient-to-b from-vortex-bg via-vortex-bg/60 to-vortex-bg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-Grexo-bg via-Grexo-bg/60 to-Grexo-bg" />
           <div className="aurora" />
         </div>
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
@@ -66,7 +66,7 @@ export default function Landing() {
             <div className="text-mono-accent mb-6" data-testid="hero-tagline">The Future of Creation</div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl tracking-tighter font-light leading-[1.05]">
               Create Anything with
-              <span className="block text-gradient-cyan font-medium mt-2">VORTEX AI</span>
+              <span className="block text-gradient-cyan font-medium mt-2">GREXO AI</span>
             </h1>
             <p className="mt-8 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
               A premium AI assistant with the elegance of a flagship product. Ask, learn, build — with Claude Sonnet 4.5 under the hood.
@@ -77,7 +77,7 @@ export default function Landing() {
               <Sparkle size={24} className="text-[#00F0FF] shrink-0" weight="duotone" />
               <input 
                 type="text" 
-                placeholder="Ask VORTEX anything..." 
+                placeholder="Ask Grexo anything..." 
                 className="flex-1 bg-transparent border-none text-white text-base outline-none focus:ring-0 placeholder:text-slate-500 w-full"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -86,7 +86,7 @@ export default function Landing() {
                 }}
               />
               <Link to="/signup">
-                <Button size="lg" className="btn-primary-vortex h-12 px-6 text-base rounded-xl">
+                <Button size="lg" className="btn-primary-Grexo h-12 px-6 text-base rounded-xl">
                   Send Message
                 </Button>
               </Link>
@@ -150,7 +150,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              { name: "Free", price: "0 rs", desc: "Try Vortex with daily credits.", features: ["100 credits / month", "Chat with Claude Sonnet 4.5", "Save chat history"], cta: "Start Free", highlight: false },
+              { name: "Free", price: "0 rs", desc: "Try Grexo with daily credits.", features: ["100 credits / month", "Chat with Claude Sonnet 4.5", "Save chat history"], cta: "Start Free", highlight: false },
               { name: "Pro", price: "299 rs", desc: "For creators who ship daily.", features: ["2,000 credits / month", "Priority response speed", "Export conversations"], cta: "Upgrade to Pro", highlight: true },
               { name: "Enterprise", price: "499 rs", desc: "Teams and power users.", features: ["Unlimited credits", "Premium support", "Team features (soon)"], cta: "Contact Sales", highlight: false },
             ].map((p) => (
@@ -172,7 +172,7 @@ export default function Landing() {
                   {p.features.map((x) => <li key={x} className="flex items-center gap-2"><span className="w-1 h-1 rounded-full bg-[#00F0FF]"/>{x}</li>)}
                 </ul>
                 <Link to="/signup">
-                  <Button className={`mt-8 w-full ${p.highlight ? "btn-primary-vortex" : "btn-ghost-vortex"}`} data-testid={`pricing-cta-${p.name.toLowerCase()}`}>{p.cta}</Button>
+                  <Button className={`mt-8 w-full ${p.highlight ? "btn-primary-Grexo" : "btn-ghost-Grexo"}`} data-testid={`pricing-cta-${p.name.toLowerCase()}`}>{p.cta}</Button>
                 </Link>
               </div>
             ))}
@@ -212,8 +212,8 @@ export default function Landing() {
           <Accordion type="single" collapsible className="space-y-3">
             {[
               { q: "Is my chat history private?", a: "Yes. Conversations are stored per user and isolated. We never share your data." },
-              { q: "Can I sign in with Google?", a: "Yes, Vortex supports both Google OAuth and email/password authentication." },
-              { q: "Do you offer a free tier?", a: "Absolutely. The Free plan gives you 100 credits per month — perfect to explore Vortex." },
+              { q: "Can I sign in with Google?", a: "Yes, Grexo supports both Google OAuth and email/password authentication." },
+              { q: "Do you offer a free tier?", a: "Absolutely. The Free plan gives you 100 credits per month — perfect to explore Grexo." },
               { q: "Can I cancel anytime?", a: "Yes, plans are flexible and you can switch or cancel from your settings at any time." },
             ].map((f, i) => (
               <AccordionItem key={i} value={`item-${i}`} className="glass rounded-xl px-5 border-0" data-testid={`faq-item-${i}`}>
@@ -229,7 +229,7 @@ export default function Landing() {
       <footer className="relative pt-24 pb-10 border-t border-white/5 mt-24">
         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-10 text-sm">
           <div>
-            <VortexLogo />
+            <GrexoLogo />
             <p className="mt-4 text-slate-500 max-w-xs">The future of creation, distilled into a beautiful chat.</p>
           </div>
           <div>
@@ -259,10 +259,10 @@ export default function Landing() {
         </div>
         <div className="max-w-7xl mx-auto px-6 mt-16">
           <div className="text-[14vw] sm:text-[10vw] font-heading font-light tracking-tighter leading-none text-white/[0.04] select-none">
-            VORTEX
+            Grexo
           </div>
           <div className="mt-6 text-xs text-slate-600 flex justify-between">
-            <span>© 2026 Vortex AI. All rights reserved.</span>
+            <span>© 2026 GREXO AI. All rights reserved.</span>
             <span>v1.0 · MVP</span>
           </div>
         </div>

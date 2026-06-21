@@ -16,7 +16,7 @@ export default function AdminAudit() {
             <div key={l.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm" data-testid={`admin-audit-row-${l.id}`}>
               <div>
                 <div className="font-medium">
-                  <span className="text-vortex-cyan">{l.action}</span> · <span className="text-slate-400">{l.admin_email}</span>
+                  <span className="text-Grexo-cyan">{l.action}</span> · <span className="text-slate-400">{l.admin_email}</span>
                 </div>
                 <div className="text-xs text-slate-500 font-mono">target: {l.target_id || "—"}</div>
               </div>

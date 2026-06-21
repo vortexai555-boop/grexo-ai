@@ -64,10 +64,10 @@ export default function BillingPage() {
               {user?.credits ?? 0} credits remaining
               {sub?.activation_code && (
                 <span className="ml-3 inline-flex items-center gap-2">
-                  · Code <span className="font-mono text-vortex-cyan" data-testid="billing-active-code">{sub.activation_code}</span>
+                  · Code <span className="font-mono text-Grexo-cyan" data-testid="billing-active-code">{sub.activation_code}</span>
                   <button
                     onClick={() => { navigator.clipboard.writeText(sub.activation_code); toast.success("Activation code copied"); }}
-                    className="inline-flex items-center gap-1 text-vortex-cyan hover:text-white text-xs"
+                    className="inline-flex items-center gap-1 text-Grexo-cyan hover:text-white text-xs"
                     data-testid="billing-copy-code"
                     title="Copy activation code"
                   >
@@ -80,7 +80,7 @@ export default function BillingPage() {
               <div className="text-xs text-slate-500 mt-1">Renews / expires {new Date(sub.end_date).toLocaleDateString()}</div>
             )}
           </div>
-          <Badge className="bg-vortex-cyan/10 text-vortex-cyan border-vortex-cyan/30 px-3 py-1.5">
+          <Badge className="bg-Grexo-cyan/10 text-Grexo-cyan border-Grexo-cyan/30 px-3 py-1.5">
             <Lightning size={14} weight="fill" className="mr-1.5" />
             {sub ? "Subscription active" : "No active subscription"}
           </Badge>
@@ -97,7 +97,7 @@ export default function BillingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
                 className={`rounded-3xl p-8 relative flex flex-col justify-between overflow-hidden shadow-2xl transition hover:transform hover:scale-[1.02] border ${
-                  isCurrent ? "border-vortex-cyan bg-vortex-cyan/5" : "border-white/5 glass"
+                  isCurrent ? "border-Grexo-cyan bg-Grexo-cyan/5" : "border-white/5 glass"
                 }`}
               >
                 <div>
@@ -110,12 +110,12 @@ export default function BillingPage() {
                   </div>
                   <ul className="mt-8 space-y-4">
                     <li className="flex items-start text-slate-300 text-sm">
-                      <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-vortex-cyan`} />
+                      <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-Grexo-cyan`} />
                       {p.credits?.toLocaleString() ?? 0} credits included
                     </li>
                     {p.features?.map((b, _i) => (
                       <li key={_i} className="flex items-start text-slate-300 text-sm">
-                        <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-vortex-cyan`} />
+                        <Check size={16} className={`mr-3 mt-0.5 shrink-0 text-Grexo-cyan`} />
                         {b}
                       </li>
                     ))}
@@ -127,7 +127,7 @@ export default function BillingPage() {
                       Current Plan
                     </Button>
                   ) : p.purchasable ? (
-                    <Button variant="default" onClick={() => goPay(p.id)} className={`w-full justify-center bg-vortex-cyan text-black hover:bg-vortex-cyan/90`} data-testid={`billing-plan-upgrade-${p.id}`}>
+                    <Button variant="default" onClick={() => goPay(p.id)} className={`w-full justify-center bg-Grexo-cyan text-black hover:bg-Grexo-cyan/90`} data-testid={`billing-plan-upgrade-${p.id}`}>
                       {p.price === 0 ? "Downgrade" : "Upgrade to " + p.name} <Lightning size={16} className="ml-2" />
                     </Button>
                   ) : (
@@ -158,7 +158,7 @@ export default function BillingPage() {
                       <div className="font-medium capitalize">{p.plan} plan</div>
                       <div className="text-xs text-slate-500">UTR: <span className="font-mono">{p.utr_number}</span> · {new Date(p.created_at).toLocaleString()}</div>
                       {p.activation_code && (
-                        <div className="text-xs text-vortex-cyan mt-1 inline-flex items-center gap-2">
+                        <div className="text-xs text-Grexo-cyan mt-1 inline-flex items-center gap-2">
                           Activation code: <span className="font-mono">{p.activation_code}</span>
                           <button
                             onClick={() => { navigator.clipboard.writeText(p.activation_code); toast.success("Activation code copied"); }}
@@ -192,7 +192,7 @@ export default function BillingPage() {
                     <div className="capitalize font-medium">{s.plan} · {s.status}</div>
                     <div className="text-xs text-slate-500">{new Date(s.start_date).toLocaleDateString()} → {s.end_date ? new Date(s.end_date).toLocaleDateString() : "—"}</div>
                   </div>
-                  <div className="font-mono text-xs text-vortex-cyan">{s.activation_code}</div>
+                  <div className="font-mono text-xs text-Grexo-cyan">{s.activation_code}</div>
                 </div>
               ))}
             </div>

@@ -116,11 +116,11 @@ export default function AdminPaymentSettings() {
 
         <div className="mt-6 flex items-center gap-3">
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" data-testid="admin-settings-qr-file" />
-          <Button onClick={() => fileRef.current?.click()} className="btn-primary-vortex" data-testid="admin-settings-qr-upload">
+          <Button onClick={() => fileRef.current?.click()} className="btn-primary-Grexo" data-testid="admin-settings-qr-upload">
             <UploadSimple size={14} className="mr-1.5" /> {qrSrc ? "Replace QR" : "Upload QR"}
           </Button>
           {qrSrc && (
-            <Button variant="outline" onClick={removeQr} className="btn-ghost-vortex" data-testid="admin-settings-qr-remove">
+            <Button variant="outline" onClick={removeQr} className="btn-ghost-Grexo" data-testid="admin-settings-qr-remove">
               <Trash size={14} className="mr-1.5" /> Remove
             </Button>
           )}
@@ -154,7 +154,7 @@ export default function AdminPaymentSettings() {
               step="0.01"
               value={settings.pro_price}
               onChange={(e) => setSettings({ ...settings, pro_price: e.target.value })}
-              className="mt-2 h-11 bg-vortex-elevated border-white/10"
+              className="mt-2 h-11 bg-Grexo-elevated border-white/10"
               data-testid="admin-settings-pro-price"
             />
           </div>
@@ -166,7 +166,7 @@ export default function AdminPaymentSettings() {
               step="0.01"
               value={settings.business_price}
               onChange={(e) => setSettings({ ...settings, business_price: e.target.value })}
-              className="mt-2 h-11 bg-vortex-elevated border-white/10"
+              className="mt-2 h-11 bg-Grexo-elevated border-white/10"
               data-testid="admin-settings-business-price"
             />
           </div>
@@ -175,7 +175,7 @@ export default function AdminPaymentSettings() {
         <div className="mt-4">
           <Label className="text-slate-300 text-xs uppercase tracking-widest">Currency</Label>
           <Select value={settings.currency} onValueChange={(v) => setSettings({ ...settings, currency: v })}>
-            <SelectTrigger className="mt-2 h-11 bg-vortex-elevated border-white/10" data-testid="admin-settings-currency">
+            <SelectTrigger className="mt-2 h-11 bg-Grexo-elevated border-white/10" data-testid="admin-settings-currency">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -193,12 +193,12 @@ export default function AdminPaymentSettings() {
             value={settings.instructions}
             onChange={(e) => setSettings({ ...settings, instructions: e.target.value })}
             placeholder="Scan the QR with your UPI app and complete payment…"
-            className="mt-2 min-h-[90px] bg-vortex-elevated border-white/10"
+            className="mt-2 min-h-[90px] bg-Grexo-elevated border-white/10"
             data-testid="admin-settings-instructions"
           />
         </div>
 
-        <Button onClick={save} disabled={saving} className="mt-6 w-full h-11 btn-primary-vortex" data-testid="admin-settings-save">
+        <Button onClick={save} disabled={saving} className="mt-6 w-full h-11 btn-primary-Grexo" data-testid="admin-settings-save">
           {saving ? "Saving…" : "Save settings"}
         </Button>
       </div>
