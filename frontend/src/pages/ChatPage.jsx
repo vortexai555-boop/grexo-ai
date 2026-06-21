@@ -193,9 +193,9 @@ useEffect(() => {
   return (
     <div className="flex h-full">
       {/* Chat list panel */}
-      <aside className="hidden lg:flex w-72 border-r border-white/5 bg-Grexo-surface/50 flex-col">
+      <aside className="hidden lg:flex w-72 border-r border-white/5 bg-grexo-surface/50 flex-col">
         <div className="p-4 border-b border-white/5">
-          <Button onClick={newChat} className="w-full btn-primary-Grexo" data-testid="new-chat-btn">
+          <Button onClick={newChat} className="w-full btn-primary-grexo" data-testid="new-chat-btn">
             <Plus size={16} className="mr-2" /> New chat
           </Button>
         </div>
@@ -219,7 +219,7 @@ useEffect(() => {
                     onChange={(e) => setRenameVal(e.target.value)}
                     onBlur={() => saveRename(c.id)}
                     onKeyDown={(e) => { if (e.key === "Enter") saveRename(c.id); if (e.key === "Escape") setRenaming(null); }}
-                    className="h-8 bg-Grexo-elevated border-white/20"
+                    className="h-8 bg-grexo-elevated border-white/20"
                     data-testid={`conv-rename-input-${c.id}`}
                   />
                 ) : (
@@ -243,7 +243,7 @@ useEffect(() => {
 
       {/* Main chat area */}
       <section className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-Grexo-surface/30">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-grexo-surface/30">
           <div className="flex items-center gap-3 min-w-0">
             <ChatCircleDots size={20} color="#00F0FF" />
             <div className="text-sm truncate" data-testid="chat-title">{current?.title || "New chat"}</div>
@@ -265,7 +265,7 @@ useEffect(() => {
             {!current?.messages?.length && (
               <div className="text-center py-16">
                 <div className="flex justify-center mb-6"><GrexoLogo size={56} withText={false} /></div>
-                <h2 className="text-3xl font-light tracking-tight">How can <span className="text-gradient-cyan">Grexo</span> help today?</h2>
+                <h2 className="text-3xl font-light tracking-tight">How can <span className="text-gradient-cyan">grexo</span> help today?</h2>
                 <p className="mt-3 text-slate-400">Ask anything. Brainstorm, debug, plan, write — start with a prompt below.</p>
                 <div className="mt-8 grid sm:grid-cols-2 gap-3 max-w-xl mx-auto">
                   {[
@@ -280,7 +280,7 @@ useEffect(() => {
                       className="glass rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:border-white/20 hover:-translate-y-0.5 transition"
                       data-testid={`prompt-suggestion-${i}`}
                     >
-                      <Sparkle size={14} className="inline mr-2 text-Grexo-cyan" /> {s}
+                      <Sparkle size={14} className="inline mr-2 text-grexo-cyan" /> {s}
                     </button>
                   ))}
                 </div>
@@ -301,14 +301,14 @@ useEffect(() => {
                       <GrexoLogo size={32} withText={false} />
                     </div>
                   )}
-                  <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-Grexo-navy text-white border border-Grexo-cyan/20" : "glass text-slate-100"} group relative`}>
+                  <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-grexo-navy text-white border border-grexo-cyan/20" : "glass text-slate-100"} group relative`}>
                     {m.role === "assistant" && (
                       <button
                         onClick={() => handleCopy(m.content, i)}
                         className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 rounded p-1.5"
                         title="Copy message"
                       >
-                        {copiedIndex === i ? <Check size={16} weight="bold" className="text-Grexo-cyan" /> : <Copy size={16} />}
+                        {copiedIndex === i ? <Check size={16} weight="bold" className="text-grexo-cyan" /> : <Copy size={16} />}
                       </button>
                     )}
                     {m.role === "assistant" ? <Markdown source={m.content} /> : <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>}
@@ -321,17 +321,17 @@ useEffect(() => {
               <div className="flex items-center gap-3 text-slate-400 text-sm">
                 <div className="w-8 h-8 rounded-full overflow-hidden"><GrexoLogo size={32} withText={false} /></div>
                 <div className="glass rounded-2xl px-5 py-3 flex items-center gap-2" data-testid="chat-loading">
-                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-Grexo-cyan animate-pulse" style={{ animationDelay: "300ms" }} />
-                  <span className="ml-2 text-xs">Grexo is thinking…</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-grexo-cyan animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-grexo-cyan animate-pulse" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-grexo-cyan animate-pulse" style={{ animationDelay: "300ms" }} />
+                  <span className="ml-2 text-xs">grexo is thinking…</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <form onSubmit={send} className="border-t border-white/5 bg-Grexo-surface/40 p-4">
+        <form onSubmit={send} className="border-t border-white/5 bg-grexo-surface/40 p-4">
           <div className="max-w-3xl mx-auto">
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
@@ -346,15 +346,18 @@ useEffect(() => {
               </div>
             )}
             <div className="glass-strong rounded-2xl p-2 flex items-end gap-2">
-              <label className="h-11 px-3 mt-auto flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" title="Upload file or image">
-                <PlusCircle size={24} weight="regular" />
-                <input type="file" multiple className="hidden" onChange={handleFileChange} />
+              <label htmlFor="file-upload-chat" className="h-11 px-3 mt-auto flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" title="Upload file or image">
+                <PlusCircle size={24} weight="regular" className="pointer-events-none" />
+                <input id="file-upload-chat" type="file" multiple accept="image/*,application/pdf" className="sr-only" onChange={(e) => {
+                  console.log("File selected:", e.target.files);
+                  handleFileChange(e);
+                }} />
               </label>
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e); } }}
-                placeholder="Message GREXO AI…"
+                placeholder="Message grexo ai…"
                 rows={1}
                 className="min-h-[44px] max-h-40 resize-none bg-transparent border-0 focus-visible:ring-0 text-base placeholder:text-slate-500"
                 data-testid="chat-input"
@@ -363,12 +366,12 @@ useEffect(() => {
                 type="button"
                 variant="ghost"
                 onClick={() => setWebSearch(!webSearch)}
-                className={`h-11 px-3 mt-auto ${webSearch ? 'text-Grexo-cyan bg-Grexo-cyan/10' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`h-11 px-3 mt-auto ${webSearch ? 'text-grexo-cyan bg-grexo-cyan/10' : 'text-slate-500 hover:text-slate-300'}`}
                 title="Toggle Web Search"
               >
                 <Globe size={20} weight={webSearch ? "fill" : "regular"} />
               </Button>
-              <Button type="submit" disabled={sending || !input.trim()} className="btn-primary-Grexo h-11 px-5" data-testid="chat-send">
+              <Button type="submit" disabled={sending || !input.trim()} className="btn-primary-grexo h-11 px-5" data-testid="chat-send">
                 <PaperPlaneRight size={16} weight="fill" />
               </Button>
             </div>
