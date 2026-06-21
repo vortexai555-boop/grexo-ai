@@ -45,7 +45,7 @@ export default function Landing() {
           <GrexoLogo />
           
           <nav className="hidden md:flex items-center gap-8 text-sm text-slate-300">
-            <a href="#top" className="hover:text-white transition" data-testid="nav-home">Home</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); window.history.pushState(null, '', '/'); }} className="hover:text-white transition" data-testid="nav-home">Home</a>
             <a href="#features" className="hover:text-white transition" data-testid="nav-features">Features</a>
             <a href="#pricing" className="hover:text-white transition" data-testid="nav-pricing">Pricing</a>
             <a href="#testimonials" className="hover:text-white transition" data-testid="nav-testimonials">Reviews</a>
@@ -75,7 +75,7 @@ export default function Landing() {
               className="md:hidden border-t border-white/10 bg-grexo-bg/95 backdrop-blur-lg overflow-hidden"
             >
               <nav className="flex flex-col px-6 py-6 gap-6 text-base text-slate-300">
-                <a href="#top" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Home</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); window.history.pushState(null, '', '/'); setIsMobileMenuOpen(false); }} className="hover:text-white transition">Home</a>
                 <a href="#features" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Features</a>
                 <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Pricing</a>
                 <a href="#testimonials" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Reviews</a>
