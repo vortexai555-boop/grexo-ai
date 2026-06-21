@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { ChatCircleDots, Clock, ArrowRight, Globe, Image as ImageIcon } from "@phosphor-icons/react";
+import { ChatCircleDots, Clock, ArrowRight, Globe, Image as ImageIcon, Lightning } from "@phosphor-icons/react";
 
 export default function DashboardHome() {
   const { user } = useAuth();
@@ -47,12 +47,12 @@ export default function DashboardHome() {
         </div>
 
         {/* Tool launcher */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
           <Link to="/dashboard/chat" className="glass rounded-2xl p-8 hover:-translate-y-1 hover:border-white/20 transition-all group" data-testid="launch-chat">
             <ChatCircleDots size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">AI Chat</h3>
             <p className="mt-1 text-slate-400 text-sm">Brainstorm, write, learn — ask Claude Sonnet 4.5 anything.</p>
-            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open chat <ArrowRight size={16} />
             </div>
           </Link>
@@ -60,7 +60,7 @@ export default function DashboardHome() {
             <Globe size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">Website Builder</h3>
             <p className="mt-1 text-slate-400 text-sm">Describe a site, get production-ready HTML, CSS & JS in seconds.</p>
-            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open builder <ArrowRight size={16} />
             </div>
           </Link>
@@ -68,8 +68,16 @@ export default function DashboardHome() {
             <ImageIcon size={28} weight="duotone" color="#00F0FF" />
             <h3 className="mt-4 text-xl font-medium">Image Generator</h3>
             <p className="mt-1 text-slate-400 text-sm">Turn text into stunning visuals with Gemini Nano Banana.</p>
-            <div className="mt-6 flex items-center gap-2 text-Grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
+            <div className="mt-6 flex items-center gap-2 text-grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
               Open generator <ArrowRight size={16} />
+            </div>
+          </Link>
+          <Link to="/dashboard/productivity" className="glass rounded-2xl p-8 hover:-translate-y-1 hover:border-white/20 transition-all group" data-testid="launch-productivity">
+            <Lightning size={28} weight="duotone" color="#00F0FF" />
+            <h3 className="mt-4 text-xl font-medium">Productivity</h3>
+            <p className="mt-1 text-slate-400 text-sm">Boost your workflow with AI-powered document & text tools.</p>
+            <div className="mt-6 flex items-center gap-2 text-grexo-cyan text-sm group-hover:translate-x-1 transition-transform">
+              Open productivity <ArrowRight size={16} />
             </div>
           </Link>
         </div>
