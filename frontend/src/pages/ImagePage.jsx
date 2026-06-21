@@ -150,7 +150,7 @@ export default function ImagePage() {
   const download = (img) => {
     const bytes = Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0));
     const blob = new Blob([bytes], { type: mimeOf(img) });
-    saveAs(blob, `Grexo-${img.id || Date.now()}.${extOf(img)}`);
+    saveAs(blob, `grexo-${img.id || Date.now()}.${extOf(img)}`);
   };
 
   return (
@@ -170,13 +170,13 @@ export default function ImagePage() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className={`glass rounded-2xl p-6 sticky top-6 transition-all ${dragActive ? "border-Grexo-cyan border bg-Grexo-cyan/5" : ""}`}>
+            <div className={`glass rounded-2xl p-6 sticky top-6 transition-all ${dragActive ? "border-grexo-cyan border bg-grexo-cyan/5" : ""}`}>
               <div className="text-mono-accent">Describe your image</div>
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="A neon cyberpunk city at midnight, raining…"
-                className="mt-3 min-h-[140px] bg-Grexo-elevated border-white/10 focus-visible:ring-Grexo-cyan resize-none"
+                className="mt-3 min-h-[140px] bg-grexo-elevated border-white/10 focus-visible:ring-grexo-cyan resize-none"
                 data-testid="image-prompt-input"
               />
 
@@ -204,10 +204,10 @@ export default function ImagePage() {
               )}
               
               <div className="mt-3 flex justify-end">
-                <label className="cursor-pointer flex items-center gap-2 text-sm text-slate-400 hover:text-Grexo-cyan transition-colors">
-                  <Paperclip size={18} />
+                <label htmlFor="file-upload-image" className="cursor-pointer flex items-center gap-2 text-sm text-slate-400 hover:text-grexo-cyan transition-colors">
+                  <Paperclip size={18} className="pointer-events-none" />
                   <span>Attach Image or PDF</span>
-                  <input type="file" multiple className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
+                  <input id="file-upload-image" type="file" multiple className="sr-only" accept="image/*,application/pdf" onChange={handleFileChange} />
                 </label>
               </div>
 
@@ -215,7 +215,7 @@ export default function ImagePage() {
                 <div>
                   <div className="text-mono-accent mb-2">Style</div>
                   <Select value={style} onValueChange={setStyle}>
-                    <SelectTrigger className="bg-Grexo-elevated border-white/10 h-11" data-testid="image-style-select"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="bg-grexo-elevated border-white/10 h-11" data-testid="image-style-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {STYLES.map((s) => (<SelectItem key={s.v} value={s.v} data-testid={`image-style-${s.v}`}>{s.l}</SelectItem>))}
                     </SelectContent>
@@ -224,7 +224,7 @@ export default function ImagePage() {
                 <div>
                   <div className="text-mono-accent mb-2">Aspect</div>
                   <Select value={aspect} onValueChange={setAspect}>
-                    <SelectTrigger className="bg-Grexo-elevated border-white/10 h-11" data-testid="image-aspect-select"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="bg-grexo-elevated border-white/10 h-11" data-testid="image-aspect-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ASPECTS.map((a) => (<SelectItem key={a.v} value={a.v}>{a.l}</SelectItem>))}
                     </SelectContent>
@@ -238,7 +238,7 @@ export default function ImagePage() {
                     <button
                       key={n}
                       onClick={() => setCount(n)}
-                      className={`flex-1 h-10 rounded-lg text-sm transition ${count === n ? "bg-Grexo-cyan text-black font-semibold" : "bg-Grexo-elevated border border-white/10 text-slate-300 hover:border-white/20"}`}
+                      className={`flex-1 h-10 rounded-lg text-sm transition ${count === n ? "bg-grexo-cyan text-black font-semibold" : "bg-grexo-elevated border border-white/10 text-slate-300 hover:border-white/20"}`}
                       data-testid={`image-count-${n}`}
                     >
                       {n}
@@ -246,7 +246,7 @@ export default function ImagePage() {
                   ))}
                 </div>
               </div>
-              <Button onClick={generate} disabled={generating || (!prompt.trim() && attachments.length === 0)} className="mt-5 w-full h-12 btn-primary-Grexo" data-testid="image-generate-btn">
+              <Button onClick={generate} disabled={generating || (!prompt.trim() && attachments.length === 0)} className="mt-5 w-full h-12 btn-primary-grexo" data-testid="image-generate-btn">
                 {generating ? "Generating…" : <><Sparkle size={16} weight="fill" className="mr-2" /> Generate</>}
               </Button>
               <div className="mt-3 text-xs text-slate-500">Costs 2 credits per image.</div>
@@ -269,9 +269,9 @@ export default function ImagePage() {
                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`grid gap-4 ${count > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                   {Array.from({ length: count }).map((_, i) => (
                     <div key={i} className={`${ASPECT_CLASS[aspect] || "aspect-square"} rounded-2xl glass relative overflow-hidden`} data-testid={`image-skeleton-${i}`}>
-                      <div className="absolute inset-0 bg-gradient-to-br from-Grexo-cyan/5 via-transparent to-Grexo-purple/10 animate-pulse" />
-                      <div className="absolute inset-0 flex items-center justify-center text-Grexo-cyan">
-                        <ImageIcon size={32} className="animate-Grexo-pulse" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-grexo-cyan/5 via-transparent to-grexo-purple/10 animate-pulse" />
+                      <div className="absolute inset-0 flex items-center justify-center text-grexo-cyan">
+                        <ImageIcon size={32} className="animate-grexo-pulse" />
                       </div>
                     </div>
                   ))}
@@ -286,7 +286,7 @@ export default function ImagePage() {
                           <Button size="icon" onClick={() => setLightbox(img)} className="bg-white/10 hover:bg-white/20 mr-2" data-testid={`image-zoom-${i}`}>
                             <MagnifyingGlassPlus size={16} />
                           </Button>
-                          <Button size="icon" onClick={() => download(img)} className="btn-primary-Grexo" data-testid={`image-download-${i}`}>
+                          <Button size="icon" onClick={() => download(img)} className="btn-primary-grexo" data-testid={`image-download-${i}`}>
                             <DownloadSimple size={16} />
                           </Button>
                         </div>
@@ -296,7 +296,7 @@ export default function ImagePage() {
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl p-16 text-center">
-                  <ImageIcon size={48} className="mx-auto text-Grexo-cyan opacity-60" />
+                  <ImageIcon size={48} className="mx-auto text-grexo-cyan opacity-60" />
                   <div className="mt-6 text-xl font-light">No images yet</div>
                   <div className="mt-2 text-slate-500 text-sm">Describe an image on the left and hit Generate.</div>
                 </motion.div>
@@ -323,14 +323,14 @@ export default function ImagePage() {
       {/* Lightbox */}
       {lightbox && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6" onClick={() => setLightbox(null)} data-testid="image-lightbox">
-          <button onClick={() => setLightbox(null)} className="absolute top-6 right-6 text-white hover:text-Grexo-cyan" data-testid="image-lightbox-close">
+          <button onClick={() => setLightbox(null)} className="absolute top-6 right-6 text-white hover:text-grexo-cyan" data-testid="image-lightbox-close">
             <X size={28} />
           </button>
           <div className="max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
             <img src={`data:${mimeOf(lightbox)};base64,${lightbox.data}`} alt="" className="w-full rounded-xl" />
             <div className="mt-4 flex items-center justify-between gap-4">
               <div className="text-sm text-slate-400 truncate flex-1">{lightbox.prompt}</div>
-              <Button onClick={() => download(lightbox)} className="btn-primary-Grexo" data-testid="image-lightbox-download">
+              <Button onClick={() => download(lightbox)} className="btn-primary-grexo" data-testid="image-lightbox-download">
                 <DownloadSimple size={14} className="mr-1.5" /> Download
               </Button>
             </div>
