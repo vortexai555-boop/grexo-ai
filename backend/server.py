@@ -215,22 +215,23 @@ async def generate_text_free(messages: list) -> str:
         if system.strip():
             config_kwargs["system_instruction"] = system.strip()
             
-        try:
-            resp = await ai_client.aio.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt.strip(),
-                config=types.GenerateContentConfig(**config_kwargs)
-            )
-            return resp.text
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "quota" in str(e).lower():
-                import httpx
-                async with httpx.AsyncClient() as client:
-                    poll_msgs = [{"role": m["role"] if m["role"] != "system" else "system", "content": m["content"]} for m in messages]
-                    res = await client.post("https://text.pollinations.ai/", json={"messages": poll_msgs}, timeout=60.0)
-                    if res.status_code == 200:
-                        return res.text
-            raise e
+        resp = await ai_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt.strip(),
+            config=types.GenerateContentConfig(**config_kwargs)
+        )
+        return resp.text
+    except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "quota" in str(e).lower():
+            import httpx
+            async with httpx.AsyncClient() as client:
+                poll_msgs = [{"role": m["role"] if m["role"] != "system" else "system", "content": m["content"]} for m in messages]
+                res = await client.post("https://text.pollinations.ai/", json={"messages": poll_msgs}, timeout=60.0)
+                if res.status_code == 200:
+                    return res.text
+        
+        logger.exception("Free text generation failed: %s", e)
+        raise e
 
 from duckduckgo_search import DDGS
 
