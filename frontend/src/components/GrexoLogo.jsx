@@ -10,7 +10,7 @@ export default function GrexoLogo({ size = 36, withText = true, className = "" }
         className="relative flex items-center justify-center"
         style={{ height: size, minWidth: size }}
       >
-        <img src="https://drive.google.com/uc?export=view&id=1ttIJIAxnbWsY6thF6mWJiOEAVjMH5OBG" alt="Grexo AI" className="h-full object-contain drop-shadow-[0_0_8px_rgba(0,255,255,0.3)]" />
+        <img src="/logo.png" alt="Grexo AI" className="h-full object-contain drop-shadow-[0_0_8px_rgba(0,255,255,0.3)]" />
       </div>
     </div>
   );
