@@ -878,12 +878,12 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         f"You are a master Web Developer. Build a luxurious, fully functional, cutting-edge {site_type} website.\n"
         f"User Requirements: {description}\n"
         f"CRITICAL RULES:\n"
-        f"1. You MUST return EXACTLY ONE single, self-contained HTML file. The preview environment ONLY supports rendering 1 HTML file.\n"
+        f"1. You MUST return EXACTLY ONE single, self-contained HTML file starting with <!DOCTYPE html>. The preview environment ONLY supports rendering 1 HTML file.\n"
         f"2. DO NOT output multi-file projects, NO package.json, NO React templates, NO Node.js or Express. STRICTLY frontend.\n"
         f"3. Include advanced embedded CSS (or Tailwind via CDN) and complex inline JavaScript to make it highly interactive and 'aggressive' in its functional output.\n"
         f"4. The code should reflect all languages (HTML, advanced CSS styling, JS logic) merged into this ONE file.\n"
         f"5. Enclose the ENTIRE file ONLY inside a single ```html code block.\n"
-        f"Do not include any other text."
+        f"6. DO NOT output any conversational text, explanations, or 'Check the code tab' warnings. Just the HTML."
     )
     try:
         if files_data:
@@ -921,7 +921,20 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         if "```html" in out:
             html = out.split("```html", 1)[1].split("```", 1)[0].strip()
         elif "```" in out:
-            html = out.split("```", 1)[1].split("```", 1)[0].strip()
+            import re
+            parts = out.split("```")
+            for p in parts[1::2]:
+                if "<html" in p or "<!DOCTYPE" in p:
+                    html = p.strip()
+                    if html.startswith("html\n"): html = html[5:]
+                    break
+            else:
+                html = parts[1].strip()
+                if html.startswith("html\n"): html = html[5:]
+        
+        if not html.lstrip().startswith("<"):
+            # Ensure it looks like HTML
+            html = "<!DOCTYPE html>\n<html><body>\n" + html + "\n</body></html>"
         site_id = new_id("site")
         rec = {
             "id": site_id, "user_id": user_id, "description": description,
