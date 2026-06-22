@@ -232,7 +232,13 @@ async def generate_text_free(messages: list) -> str:
                     data = resp.json()
                     if "choices" in data and len(data["choices"]) > 0:
                         msg = data["choices"][0].get("message", {})
-                        content = msg.get("content", str(data))
+                        content_val = msg.get("content")
+                        if content_val:
+                            content = str(content_val)
+                        elif "reasoning" in msg and msg["reasoning"]:
+                            content = str(msg["reasoning"])
+                        else:
+                            content = str(data)
                     else:
                         content = resp.text
                 except:
@@ -253,24 +259,21 @@ from duckduckgo_search import DDGS
 
 async def web_search(query: str):
     try:
+        def _search():
+            try:
+                from duckduckgo_search import DDGS
+                with DDGS() as ddgs:
+                    return list(ddgs.text(query, max_results=3))
+            except Exception:
+                return []
+                
+        search_res = await asyncio.to_thread(_search)
+        if search_res:
+             return search_res
+        
+        # Fallback to Wikipedia API
         import httpx
-        import re
         import urllib.parse
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-            resp = await client.get(f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}", headers=headers)
-            if resp.status_code == 200:
-                html = resp.text
-                snippets = re.findall(r'<a class=\"result__snippet[^>]*>(.*?)</a>', html, flags=re.IGNORECASE | re.DOTALL)
-                if snippets:
-                    results = []
-                    for i, s in enumerate(snippets[:3]):
-                        clean_s = re.sub(r'<[^>]+>', '', s).strip()
-                        clean_s = clean_s.replace('&#x27;', "'").replace('&amp;', '&').replace('&quot;', '"')
-                        results.append({"title": f"Result {i+1}", "body": clean_s})
-                    return results
-
-        # Fallback to Wikipedia API if all DuckDuckGo fails (very useful for people like elon musk)
         async with httpx.AsyncClient(timeout=10.0) as client:
             wiki_search = await client.get(f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(query)}&limit=1&namespace=0&format=json")
             if wiki_search.status_code == 200:
@@ -284,19 +287,6 @@ async def web_search(query: str):
                             extract = pages[page_id].get('extract', '')
                             if extract:
                                 return [{"title": f"Wikipedia: {title}", "body": extract}]
-                                
-        def _search():
-            try:
-                from duckduckgo_search import DDGS
-                with DDGS() as ddgs:
-                    return list(ddgs.text(query, max_results=3))
-            except Exception:
-                return []
-                
-        search_res = await asyncio.to_thread(_search)
-        if search_res:
-            return search_res
-            
         return []
     except Exception as e:
         logger.exception("search failed: %s", e)
@@ -564,8 +554,6 @@ async def chat_send(
                 "content": m.get("content", "")
             })
             
-        user_content_parts = []
-        
         main_message = body.message
         if body.web_search:
             try:
@@ -575,10 +563,9 @@ async def chat_send(
                     main_message = f"User Question:\n{body.message}\n\nExternal Search Results:\n{search_context}\n\n(Use these search results to answer if they are helpful, otherwise answer normally. Do not say you don't have information if the search results contain it.)"
             except Exception as e:
                 logger.error("Web search failed: %s", e)
-                
-        user_content_parts.append({"type": "text", "text": main_message})
 
         if body.files:
+            user_content_parts = [{"type": "text", "text": main_message}]
             for file in body.files:
                 b64_data = file["data"]
                 if "," in b64_data:
@@ -590,8 +577,9 @@ async def chat_send(
                     "type": "image_url",
                     "image_url": {"url": full_data_uri}
                 })
-        
-        messages_openai.append({"role": "user", "content": user_content_parts})
+            messages_openai.append({"role": "user", "content": user_content_parts})
+        else:
+            messages_openai.append({"role": "user", "content": main_message})
 
         reply = await generate_text_free(messages_openai)
 
@@ -656,13 +644,10 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
         user_prompt += f"Input:\n{body.input_text}\n"
 
     try:
-        user_content_parts = []
-        user_content_parts.append({
-            "type": "text", 
-            "text": user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
-        })
+        main_text = user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
 
         if body.file_data:
+            user_content_parts = [{"type": "text", "text": main_text}]
             mime_type = body.file_mime or "application/pdf"
             b64_data = body.file_data
             if "," in b64_data:
@@ -674,10 +659,13 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
                 "type": "image_url",
                 "image_url": {"url": full_data_uri}
             })
+            final_content = user_content_parts
+        else:
+            final_content = main_text
 
         messages = [
             {"role": "system", "content": system_instruction},
-            {"role": "user", "content": user_content_parts}
+            {"role": "user", "content": final_content}
         ]
         
         reply = await generate_text_free(messages)
