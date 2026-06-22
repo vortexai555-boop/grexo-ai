@@ -263,7 +263,7 @@ async def generate_text_free(messages: list) -> str:
                                 # Fix missing padding if any
                                 b64 += "=" * ((4 - len(b64) % 4) % 4)
                                 parts.append(types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime))
-                gemini_messages.append({"role": role, "parts": parts})
+                gemini_messages.append(types.Content(role=role, parts=parts))
             
             geminiConfig = {}
             if system_instruction:
@@ -911,10 +911,10 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
     prompt = (
         f"Build a beautiful, modern, fully responsive {site_type} system. "
         f"Requirements: {description}. "
-        f"You must build a complete realistic codebase. DO NOT restrict yourself to just HTML/CSS. "
-        f"Use HTML, SCSS/Sass or CSS, JavaScript, Python, Java, or whatever backend/frontend languages are best suited for a real production SaaS environment. "
-        f"Return the codebase as a series of Markdown code blocks. Each block MUST start with the file name as a comment on the VERY FIRST line of the code content (e.g. `<!-- index.html -->`, `/* style.css */`, `# app.py`, `// Main.java`). "
-        f"Include a full realistic architecture."
+        f"CRITICAL: To ensure the website can be previewed instantly in the browser, you MUST provide a complete, visually stunning `index.html` file that includes all necessary HTML, CSS (e.g. via Tailwind CDN), and client-side JavaScript. This `index.html` must render the full UI correctly without requiring a local web server. "
+        f"In addition to the frontend, you must build the rest of a complete realistic codebase for a production environment. Provide backend code, database schemas, or whatever backend/frontend languages are needed (e.g. Node.js, Python, Java). "
+        f"Return the codebase as a series of Markdown code blocks. Each block MUST start with the file name as a comment on the VERY FIRST line of the code content (e.g. `<!-- index.html -->`, `/* style.css */`, `# app.py`, `// server.js`). "
+        f"Ensure `index.html` is the primary visual file."
     )
     try:
         if files_data:
