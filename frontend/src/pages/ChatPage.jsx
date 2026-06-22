@@ -110,7 +110,10 @@ useEffect(() => {
     setAttachments([]);
 
     // Optimistic add
-    const displayMsg = text || (attachments.length > 0 ? `[Attached ${attachments.length} file(s)]` : "");
+    let displayMsg = text;
+    if (attachments.length > 0) {
+      displayMsg = text ? `${text}\n\n*[Attached ${attachments.length} file(s)]*` : `*[Attached ${attachments.length} file(s)]*`;
+    }
     const optimistic = { role: "user", content: displayMsg, ts: new Date().toISOString() };
     setCurrent((c) => c ? { ...c, messages: [...(c.messages || []), optimistic] } : { id: null, messages: [optimistic], title: text ? text.slice(0, 60) : "New chat" });
     try {
@@ -384,7 +387,7 @@ useEffect(() => {
               >
                 <Globe size={20} weight={webSearch ? "fill" : "regular"} />
               </Button>
-              <Button type="submit" disabled={sending || !input.trim()} className="btn-primary-grexo h-11 px-5" data-testid="chat-send">
+              <Button type="submit" disabled={sending || (!input.trim() && attachments.length === 0)} className="btn-primary-grexo h-11 px-5" data-testid="chat-send">
                 <PaperPlaneRight size={16} weight="fill" />
               </Button>
             </div>
