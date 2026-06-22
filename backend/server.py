@@ -219,6 +219,67 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
 
 
 async def generate_text_free(messages: list) -> str:
+    # Try using Gemini first to support multimodal parts
+    import os
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    
+    # Check if there are any multimodal elements
+    has_images = any(
+        isinstance(m["content"], list) and any(c.get("type") == "image_url" for c in m["content"])
+        for m in messages
+    )
+    
+    if has_images and not gemini_key:
+        raise HTTPException(
+            status_code=400, 
+            detail="GEMINI_API_KEY is missing. The fallback AI (Pollinations) does not support image analysis. Please configure your Gemini API Key in the backend .env file to enable vision."
+        )
+
+    if gemini_key:
+        try:
+            gemini_messages = []
+            system_instruction = ""
+            for m in messages:
+                if m["role"] == "system":
+                    system_instruction += m["content"] + "\n"
+                    continue
+                
+                role = "user" if m["role"] == "user" else "model"
+                parts = []
+                
+                if isinstance(m["content"], str):
+                    parts.append(m["content"])
+                elif isinstance(m["content"], list):
+                    for c in m["content"]:
+                        if c.get("type") == "text":
+                            parts.append(c["text"])
+                        elif c.get("type") == "image_url":
+                            url = c["image_url"]["url"]
+                            if url.startswith("data:"):
+                                mime, b64 = url.split(";", 1)
+                                mime = mime.replace("data:", "")
+                                b64 = b64.replace("base64,", "")
+                                import base64
+                                # Fix missing padding if any
+                                b64 += "=" * ((4 - len(b64) % 4) % 4)
+                                parts.append(types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime))
+                gemini_messages.append({"role": role, "parts": parts})
+            
+            geminiConfig = {}
+            if system_instruction:
+                geminiConfig["system_instruction"] = system_instruction
+            
+            resp = await ai_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=gemini_messages,
+                config=geminiConfig
+            )
+            return resp.text.strip()
+        except Exception as ex:
+            logger.error(f"Gemini generation failed: {ex}, falling back to pollinations.")
+            if has_images:
+                raise HTTPException(status_code=500, detail=f"Gemini AI failed to process image: {ex}")
+
     try:
         import httpx
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -232,13 +293,13 @@ async def generate_text_free(messages: list) -> str:
                     data = resp.json()
                     if "choices" in data and len(data["choices"]) > 0:
                         msg = data["choices"][0].get("message", {})
-                        content_val = msg.get("content")
-                        if content_val:
-                            content = str(content_val)
-                        elif "reasoning" in msg and msg["reasoning"]:
-                            content = str(msg["reasoning"])
-                        else:
-                            content = str(data)
+                        content = msg.get("content")
+                        if not content:
+                            reasoning = msg.get("reasoning", "")
+                            if reasoning:
+                                content = "I cannot determine the exact answer without internet access. Please turn on 'Web Search' for this query."
+                            else:
+                                content = "I couldn't generate a proper response."
                     else:
                         content = resp.text
                 except:
@@ -260,34 +321,10 @@ from duckduckgo_search import DDGS
 async def web_search(query: str):
     try:
         def _search():
-            try:
-                from duckduckgo_search import DDGS
-                with DDGS() as ddgs:
-                    return list(ddgs.text(query, max_results=3))
-            except Exception:
-                return []
-                
-        search_res = await asyncio.to_thread(_search)
-        if search_res:
-             return search_res
-        
-        # Fallback to Wikipedia API
-        import httpx
-        import urllib.parse
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            wiki_search = await client.get(f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(query)}&limit=1&namespace=0&format=json")
-            if wiki_search.status_code == 200:
-                data = wiki_search.json()
-                if len(data) > 1 and len(data[1]) > 0:
-                    title = data[1][0]
-                    wiki_page = await client.get(f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exsentences=10&titles={urllib.parse.quote(title)}&explaintext=1&format=json")
-                    if wiki_page.status_code == 200:
-                        pages = wiki_page.json().get('query', {}).get('pages', {})
-                        for page_id in pages:
-                            extract = pages[page_id].get('extract', '')
-                            if extract:
-                                return [{"title": f"Wikipedia: {title}", "body": extract}]
-        return []
+            from duckduckgo_search import DDGS
+            with DDGS() as ddgs:
+                return list(ddgs.text(query, max_results=5))
+        return await asyncio.to_thread(_search)
     except Exception as e:
         logger.exception("search failed: %s", e)
         return []
@@ -542,7 +579,7 @@ async def chat_send(
         [f"{m['role'].upper()}: {m.get('content', '')}" for m in history[:-1]]
     )
 
-    current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
+    current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data. Do NOT attempt to use tools, web search, or output tool calls—just provide the final answer directly in text."
     
     try:
         messages_openai = [
@@ -554,18 +591,23 @@ async def chat_send(
                 "content": m.get("content", "")
             })
             
+        user_content_parts = []
+        
         main_message = body.message
         if body.web_search:
             try:
                 results = await web_search(body.message)
                 if results:
                     search_context = "Recent relevant web search results:\n" + "\n".join([f"- {r.get('title')}: {r.get('body')}" for r in results])
-                    main_message = f"User Question:\n{body.message}\n\nExternal Search Results:\n{search_context}\n\n(Use these search results to answer if they are helpful, otherwise answer normally. Do not say you don't have information if the search results contain it.)"
+                    main_message = f"{body.message}\n\n{search_context}\n\nPlease use the above search results to inform your answer if they are relevant. I have ALREADY performed the web search for you, so DO NOT output any reasoning or text saying 'let me search' or 'I will use a search tool'. Just answer the user's question directly using the provided info."
             except Exception as e:
                 logger.error("Web search failed: %s", e)
+        else:
+            main_message = f"{body.message}\n\nCRITICAL INSTRUCTION: You DO NOT have access to any external tools, search engines, or live data. You MUST answer directly based on your internal knowledge. DO NOT output internal reasoning like 'Let me search' or 'I need to use a tool'. Give your best possible answer directly."
+
+        user_content_parts.append({"type": "text", "text": main_message})
 
         if body.files:
-            user_content_parts = [{"type": "text", "text": main_message}]
             for file in body.files:
                 b64_data = file["data"]
                 if "," in b64_data:
@@ -577,9 +619,8 @@ async def chat_send(
                     "type": "image_url",
                     "image_url": {"url": full_data_uri}
                 })
-            messages_openai.append({"role": "user", "content": user_content_parts})
-        else:
-            messages_openai.append({"role": "user", "content": main_message})
+        
+        messages_openai.append({"role": "user", "content": user_content_parts})
 
         reply = await generate_text_free(messages_openai)
 
@@ -644,10 +685,13 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
         user_prompt += f"Input:\n{body.input_text}\n"
 
     try:
-        main_text = user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
+        user_content_parts = []
+        user_content_parts.append({
+            "type": "text", 
+            "text": user_prompt or ("Extract text from this file." if body.tool_id == "ocr" else "Please process this document.")
+        })
 
         if body.file_data:
-            user_content_parts = [{"type": "text", "text": main_text}]
             mime_type = body.file_mime or "application/pdf"
             b64_data = body.file_data
             if "," in b64_data:
@@ -659,13 +703,10 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
                 "type": "image_url",
                 "image_url": {"url": full_data_uri}
             })
-            final_content = user_content_parts
-        else:
-            final_content = main_text
 
         messages = [
             {"role": "system", "content": system_instruction},
-            {"role": "user", "content": final_content}
+            {"role": "user", "content": user_content_parts}
         ]
         
         reply = await generate_text_free(messages)
@@ -868,9 +909,12 @@ async def website_generate(body: WebsiteIn, user=Depends(get_current_user)):
 
 async def _run_website_job(job_id: str, user_id: str, description: str, site_type: str, files_data: list):
     prompt = (
-        f"Build a beautiful, modern, fully responsive {site_type} website as a SINGLE self-contained HTML file. "
-        f"Requirements: {description}. Use inline CSS and JS. Include header, hero, features, CTA, footer. "
-        f"Return ONLY the HTML inside a ```html fenced block."
+        f"Build a beautiful, modern, fully responsive {site_type} system. "
+        f"Requirements: {description}. "
+        f"You must build a complete realistic codebase. DO NOT restrict yourself to just HTML/CSS. "
+        f"Use HTML, SCSS/Sass or CSS, JavaScript, Python, Java, or whatever backend/frontend languages are best suited for a real production SaaS environment. "
+        f"Return the codebase as a series of Markdown code blocks. Each block MUST start with the file name as a comment on the VERY FIRST line of the code content (e.g. `<!-- index.html -->`, `/* style.css */`, `# app.py`, `// Main.java`). "
+        f"Include a full realistic architecture."
     )
     try:
         if files_data:
@@ -900,11 +944,8 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         else:
             out = await llm_complete(SYSTEM_PROMPTS["website"], prompt)
         
+        # Keep the raw markdown containing all files
         html = out
-        if "```html" in out:
-            html = out.split("```html", 1)[1].split("```", 1)[0].strip()
-        elif "```" in out:
-            html = out.split("```", 1)[1].split("```", 1)[0].strip()
         site_id = new_id("site")
         rec = {
             "id": site_id, "user_id": user_id, "description": description,
