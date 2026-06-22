@@ -238,6 +238,22 @@ def detect_image_mime(b64: str) -> str:
     return "image/png"
 
 
+async def generate_content_with_retry(model: str, contents: list, config: types.GenerateContentConfig, max_retries: int = 5) -> Any:
+    for attempt in range(max_retries):
+        try:
+            return await ai_client.aio.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config
+            )
+        except Exception as e:
+            if "503" in str(e) and attempt < max_retries - 1:
+                delay = 2 ** attempt
+                logger.warning(f"503 UNAVAILABLE encountered, retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+            else:
+                raise
+
 async def llm_complete(system: str, user_text: str, session_id: Optional[str] = None) -> str:
     messages = [
         {"role": "system", "content": f"{system}\nCurrent year is 2026. Current date is June 2026."},
@@ -253,7 +269,7 @@ async def generate_text_free(messages: list) -> str:
         if system_instruction:
             config.system_instruction = system_instruction
             
-        resp = await ai_client.aio.models.generate_content(
+        resp = await generate_content_with_retry(
             model='gemini-2.5-flash',
             contents=contents,
             config=config
@@ -570,7 +586,7 @@ async def chat_send(
         if system_instruction:
             config.system_instruction = system_instruction
 
-        resp = await ai_client.aio.models.generate_content(
+        resp = await generate_content_with_retry(
             model='gemini-2.5-flash',
             contents=contents,
             config=config
@@ -665,7 +681,7 @@ async def productivity_generate(body: ProductivityIn, user=Depends(get_current_u
             if sys_inst:
                 config.system_instruction = sys_inst
                 
-            resp = await ai_client.aio.models.generate_content(
+            resp = await generate_content_with_retry(
                 model='gemini-2.5-flash',
                 contents=contents,
                 config=config
@@ -908,7 +924,7 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
             if sys_inst:
                 config.system_instruction = sys_inst
                 
-            resp = await ai_client.aio.models.generate_content(
+            resp = await generate_content_with_retry(
                 model='gemini-2.5-flash',
                 contents=contents,
                 config=config
