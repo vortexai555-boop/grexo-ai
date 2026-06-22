@@ -35,7 +35,6 @@ export default function WebsitePage() {
   const [siteType, setSiteType] = useState("landing");
   const [generating, setGenerating] = useState(false);
   const [current, setCurrent] = useState(null); // { id, html, description }
-  const [selectedFile, setSelectedFile] = useState('');
   const [history, setHistory] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const iframeRef = useRef(null);
@@ -49,101 +48,6 @@ export default function WebsitePage() {
 
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const parseFiles = (text) => {
-    if (!text) return { preview: "", files: {} };
-    const files = {};
-    let htmlPreview = "";
-
-    const blocks = text.split("```");
-    if (blocks.length > 1) {
-      for (let i = 1; i < blocks.length; i += 2) {
-        const block = blocks[i];
-        const lines = block.split('\n');
-        const langInfo = lines.shift().trim();
-        const lang = langInfo.split(' ')[0].toLowerCase();
-        if (lines.length === 0) continue;
-        
-        let content = lines.join('\n');
-        let filename = `file_${i}.${lang || 'txt'}`;
-        
-        const firstLine = lines[0].trim();
-        let match = firstLine.match(/<!--\s*([a-zA-Z0-9_\-\.]+)\s*-->/);
-        if (!match) match = firstLine.match(/\/\*\s*([a-zA-Z0-9_\-\.]+)\s*\*\//);
-        if (!match) match = firstLine.match(/#\s*([a-zA-Z0-9_\-\.]+)/);
-        if (!match) match = firstLine.match(/\/\/\s*([a-zA-Z0-9_\-\.]+)/);
-        
-        if (match && match[1] && match[1].includes('.')) {
-          filename = match[1].trim();
-        } else {
-          if (lang === 'html' && !files['index.html']) filename = 'index.html';
-          else if (lang === 'css' && !files['style.css']) filename = 'style.css';
-          else if ((lang === 'javascript' || lang === 'js') && !files['script.js']) filename = 'script.js';
-          else if (lang === 'python' && !files['app.py']) filename = 'app.py';
-          else if (lang === 'json' && !files['package.json']) filename = 'package.json';
-        }
-
-        if (filename.toLowerCase() === 'index.html' || (lang === 'html' && !htmlPreview)) {
-          htmlPreview = content;
-          filename = 'index.html';
-        }
-        files[filename] = content;
-      }
-    } else {
-      // No markdown blocks found at all
-      if (text.includes("<!DOCTYPE html>") || text.includes("<html")) {
-         htmlPreview = text;
-         files['index.html'] = text;
-      } else {
-         files['output.txt'] = text;
-      }
-    }
-    
-    if (Object.keys(files).length === 0) {
-      const escapedText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return { 
-        preview: `<html><body style="font-family: sans-serif; padding: 2rem; background: #111; color: #ccc; white-space: pre-wrap; word-wrap: break-word;">${escapedText}</body></html>`, 
-        files: { 'output.txt': text } 
-      };
-    }
-    
-    // Inject scripts/css into HTML preview if they are separate files
-    if (htmlPreview) {
-      for (const [fname, fcontent] of Object.entries(files)) {
-        if (fname.endsWith('.css')) {
-          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
-            const styleBlock = `\n<style>\n/* ${fname} */\n${fcontent}\n</style>\n`;
-            if (htmlPreview.includes('</head>')) {
-              htmlPreview = htmlPreview.replace('</head>', `${styleBlock}</head>`);
-            } else {
-              htmlPreview += styleBlock;
-            }
-          }
-        } else if (fname.endsWith('.js') && !['vite.config.js', 'tailwind.config.js', 'postcss.config.js', 'server.js', 'app.js'].includes(fname.toLowerCase())) {
-          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
-            const scriptBlock = `\n<script>\n// ${fname}\n${fcontent}\n</script>\n`;
-            if (htmlPreview.includes('</body>')) {
-              htmlPreview = htmlPreview.replace('</body>', `${scriptBlock}</body>`);
-            } else {
-              htmlPreview += scriptBlock;
-            }
-          }
-        }
-      }
-      
-      // Auto-inject Tailwind if missing but classes seem to be used
-      if (!htmlPreview.includes('tailwindcss') && !htmlPreview.includes('tailwind.min.css') && htmlPreview.includes('class=')) {
-        const tailwindCdn = `<script src="https://cdn.tailwindcss.com"></script>\n</head>`;
-        if (htmlPreview.includes('</head>')) {
-          htmlPreview = htmlPreview.replace('</head>', tailwindCdn);
-        } else {
-          htmlPreview = `<script src="https://cdn.tailwindcss.com"></script>\n` + htmlPreview;
-        }
-      }
-    }
-
-    return { preview: htmlPreview || "<html><body><h2 style='font-family:sans-serif;color:white;padding:2rem;'>Backend or component code generated.</h2><p style='font-family:sans-serif;color:#888;padding:0 2rem;'>Check the Code tab to view the generated files. A full visual preview requires an index.html file.</p></body></html>", files };
   };
 
   const loadHistory = async () => {
@@ -224,20 +128,14 @@ export default function WebsitePage() {
 
   const downloadHtml = () => {
     if (!current?.html) return;
-    const { preview } = parseFiles(current.html);
-    const blob = new Blob([preview], { type: "text/html" });
+    const blob = new Blob([current.html], { type: "text/html" });
     saveAs(blob, `grexo-site-${current.id || Date.now()}.html`);
   };
 
   const downloadZip = async () => {
     if (!current?.html) return;
     const zip = new JSZip();
-    const { files } = parseFiles(current.html);
-    
-    for (const [filename, content] of Object.entries(files)) {
-      zip.file(filename, content);
-    }
-    
+    zip.file("index.html", current.html);
     zip.file("README.md", `# grexo ai Generated Site\n\nPrompt: ${current.description || description}\nGenerated: ${new Date().toISOString()}\n\n## To preview\nOpen index.html in any browser.\n`);
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `grexo-site-${current.id || Date.now()}.zip`);
@@ -363,7 +261,7 @@ export default function WebsitePage() {
                         <div className="rounded-xl overflow-hidden border border-white/5 bg-white">
                           <iframe
                             ref={iframeRef}
-                            srcDoc={parseFiles(current.html).preview}
+                            srcDoc={current.html}
                             title="Generated website preview"
                             sandbox="allow-scripts"
                             className="w-full h-[640px] bg-white"
@@ -372,31 +270,9 @@ export default function WebsitePage() {
                         </div>
                       </TabsContent>
                       <TabsContent value="code" className="m-0">
-                        <div className="flex h-[640px] rounded-xl border border-white/5 bg-[#07080d] overflow-hidden">
-                          <div className="w-1/3 min-w-[200px] border-r border-white/5 bg-black/40 overflow-y-auto p-2">
-                            <div className="text-xs text-slate-500 uppercase tracking-widest font-semibold px-3 py-2 mb-1">Project Files</div>
-                            {Object.entries(parseFiles(current.html).files).map(([filename, content]) => (
-                               <button
-                                 key={filename}
-                                 onClick={() => setSelectedFile(filename)}
-                                 className={`w-full text-left px-3 py-2 rounded text-sm transition ${
-                                    (selectedFile || Object.keys(parseFiles(current.html).files)[0]) === filename
-                                      ? 'bg-grexo-cyan/10 text-grexo-cyan' 
-                                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                                 }`}
-                               >
-                                 {filename}
-                               </button>
-                            ))}
-                          </div>
-                          <div className="flex-1 overflow-auto p-4 w-2/3">
-                            <pre className="text-xs leading-relaxed">
-                              <code className="text-cyan-100" data-testid="website-code-block">
-                                {parseFiles(current.html).files[selectedFile || Object.keys(parseFiles(current.html).files)[0]] || current.html}
-                              </code>
-                            </pre>
-                          </div>
-                        </div>
+                        <pre className="rounded-xl border border-white/5 bg-[#07080d] p-4 overflow-auto max-h-[640px] text-xs leading-relaxed">
+                          <code className="text-cyan-100" data-testid="website-code-block">{current.html}</code>
+                        </pre>
                       </TabsContent>
                     </Tabs>
                   </div>
