@@ -90,12 +90,12 @@ useEffect(() => {
     }
   }, [current?.messages, sending, isAtBottom]);
   
-  const send = async (e) => {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text || sending) return;
-    setInput("");
-    setSending(true);
+    const send = async (e) => {
+      e?.preventDefault();
+      const text = input.trim();
+      if ((!text && attachments.length === 0) || sending) return;
+      setInput("");
+      setSending(true);
 
     const filesBase64 = await Promise.all(
       attachments.map((file) => {
@@ -110,10 +110,11 @@ useEffect(() => {
     setAttachments([]);
 
     // Optimistic add
-    const optimistic = { role: "user", content: text, ts: new Date().toISOString() };
-    setCurrent((c) => c ? { ...c, messages: [...(c.messages || []), optimistic] } : { id: null, messages: [optimistic], title: text.slice(0, 60) });
+    const displayMsg = text || (attachments.length > 0 ? `[Attached ${attachments.length} file(s)]` : "");
+    const optimistic = { role: "user", content: displayMsg, ts: new Date().toISOString() };
+    setCurrent((c) => c ? { ...c, messages: [...(c.messages || []), optimistic] } : { id: null, messages: [optimistic], title: text ? text.slice(0, 60) : "New chat" });
     try {
-      const r = await api.post("/chat/send", { conversation_id: current?.id || null, message: text, tool: "chat", web_search: webSearch, files: filesBase64 });
+      const r = await api.post("/chat/send", { conversation_id: current?.id || null, message: displayMsg, tool: "chat", web_search: webSearch, files: filesBase64 });
       const newCid = r.data.conversation_id;
       const aiMsg = { role: "assistant", content: r.data.reply, ts: new Date().toISOString() };
       setCurrent((c) => ({ ...(c || {}), id: newCid, messages: [...(c?.messages || []), aiMsg] }));
@@ -346,13 +347,21 @@ useEffect(() => {
               </div>
             )}
             <div className="glass-strong rounded-2xl p-2 flex items-end gap-2">
-              <label htmlFor="file-upload-chat" className="h-11 px-3 mt-auto flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" title="Upload file or image">
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('file-upload-chat').click();
+                }} 
+                className="h-11 px-3 mt-auto flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" 
+                title="Upload file or image"
+              >
                 <PlusCircle size={24} weight="regular" className="pointer-events-none" />
-                <input id="file-upload-chat" type="file" multiple accept="image/*,application/pdf" className="sr-only" onChange={(e) => {
-                  console.log("File selected:", e.target.files);
-                  handleFileChange(e);
-                }} />
-              </label>
+              </button>
+              <input id="file-upload-chat" type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => {
+                console.log("File selected:", e.target.files);
+                handleFileChange(e);
+              }} />
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
