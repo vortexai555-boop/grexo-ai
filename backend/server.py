@@ -222,6 +222,19 @@ async def generate_text_free(messages: list) -> str:
     # Try using Gemini first to support multimodal parts
     import os
     gemini_key = os.getenv("GEMINI_API_KEY", "")
+    
+    # Check if there are any multimodal elements
+    has_images = any(
+        isinstance(m["content"], list) and any(c.get("type") == "image_url" for c in m["content"])
+        for m in messages
+    )
+    
+    if has_images and not gemini_key:
+        raise HTTPException(
+            status_code=400, 
+            detail="GEMINI_API_KEY is missing. The fallback AI (Pollinations) does not support image analysis. Please configure your Gemini API Key in the backend .env file to enable vision."
+        )
+
     if gemini_key:
         try:
             gemini_messages = []
@@ -247,6 +260,8 @@ async def generate_text_free(messages: list) -> str:
                                 mime = mime.replace("data:", "")
                                 b64 = b64.replace("base64,", "")
                                 import base64
+                                # Fix missing padding if any
+                                b64 += "=" * ((4 - len(b64) % 4) % 4)
                                 parts.append(types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime))
                 gemini_messages.append({"role": role, "parts": parts})
             
@@ -262,6 +277,8 @@ async def generate_text_free(messages: list) -> str:
             return resp.text.strip()
         except Exception as ex:
             logger.error(f"Gemini generation failed: {ex}, falling back to pollinations.")
+            if has_images:
+                raise HTTPException(status_code=500, detail=f"Gemini AI failed to process image: {ex}")
 
     try:
         import httpx
