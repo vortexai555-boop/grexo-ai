@@ -232,7 +232,9 @@ async def generate_text_free(messages: list) -> str:
                     data = resp.json()
                     if "choices" in data and len(data["choices"]) > 0:
                         msg = data["choices"][0].get("message", {})
-                        content = msg.get("content", str(data))
+                        content = msg.get("content")
+                        if not content:
+                            content = msg.get("reasoning", str(data))
                     else:
                         content = resp.text
                 except:
@@ -512,7 +514,7 @@ async def chat_send(
         [f"{m['role'].upper()}: {m.get('content', '')}" for m in history[:-1]]
     )
 
-    current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
+    current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Use the provided search results to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
     
     try:
         messages_openai = [
