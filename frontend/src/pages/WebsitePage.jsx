@@ -80,7 +80,9 @@ export default function WebsitePage() {
         } else {
           if (lang === 'html' && !files['index.html']) filename = 'index.html';
           else if (lang === 'css' && !files['style.css']) filename = 'style.css';
-          else if ((lang === 'javascript' || lang === 'js') && !files['script.js']) filename = 'script.js';
+          else if ((lang === 'javascript' || lang === 'js' || lang === 'jsx' || lang === 'tsx') && !files['App.jsx'] && !files['script.js']) {
+             filename = (lang === 'jsx' || lang === 'tsx' || content.includes('import React') || content.includes('export default function')) ? 'App.jsx' : 'script.js';
+          }
           else if (lang === 'python' && !files['app.py']) filename = 'app.py';
           else if (lang === 'json' && !files['package.json']) filename = 'package.json';
         }
@@ -92,7 +94,6 @@ export default function WebsitePage() {
         files[filename] = content;
       }
     } else {
-      // No markdown blocks found at all
       if (text.includes("<!DOCTYPE html>") || text.includes("<html")) {
          htmlPreview = text;
          files['index.html'] = text;
@@ -109,31 +110,150 @@ export default function WebsitePage() {
       };
     }
     
-    // Inject scripts/css into HTML preview if they are separate files
+    const isReact = Object.keys(files).some(f => f.endsWith('.jsx') || f.endsWith('.tsx') || files[f].includes('import React'));
+
+    if (!htmlPreview) {
+       if (isReact) {
+         htmlPreview = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.2.0",
+      "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+      "react-dom": "https://esm.sh/react-dom@18.2.0",
+      "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+      "clsx": "https://esm.sh/clsx@2.1.0",
+      "tailwind-merge": "https://esm.sh/tailwind-merge@2.2.1",
+      "framer-motion": "https://esm.sh/framer-motion@11.0.8",
+      "recharts": "https://esm.sh/recharts@2.12.2"
+    }
+  }
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+     #error-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: #ff5555; padding: 2rem; font-family: monospace; z-index: 9999; white-space: pre-wrap; overflow-y: auto; }
+     body { margin: 0; padding: 0; }
+  </style>
+  <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+       showError(msg + '\\nLine: ' + lineNo);
+       return false;
+    };
+    function showError(err) {
+       const el = document.getElementById('error-overlay');
+       if (el) { el.style.display = 'block'; el.textContent += err + '\\n\\n'; }
+    }
+    const originalError = console.error;
+    console.error = function(...args) {
+       showError(args.join(' '));
+       originalError.apply(console, args);
+    }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="error-overlay"></div>
+</body>
+</html>`;
+       } else {
+         htmlPreview = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+     #error-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: #ff5555; padding: 2rem; font-family: monospace; z-index: 9999; white-space: pre-wrap; overflow-y: auto; }
+    </style>
+    <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+         showError(msg + '\\nLine: ' + lineNo);
+         return false;
+      };
+      function showError(err) {
+         const el = document.getElementById('error-overlay');
+         if (el) { el.style.display = 'block'; el.textContent += err + '\\n\\n'; }
+      }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="error-overlay"></div>
+</body>
+</html>`;
+       }
+    }
+
     if (htmlPreview) {
+      // Inject Error overlay if not exists
+      if (!htmlPreview.includes('error-overlay')) {
+         const overlayContent = `<div id="error-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: #ff5555; padding: 2rem; font-family: monospace; z-index: 9999; white-space: pre-wrap; overflow-y: auto;"></div>
+<script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+       const el = document.getElementById('error-overlay');
+       if(el) { el.style.display = 'block'; el.textContent += msg + '\\nLine: ' + lineNo + '\\n\\n'; }
+       return false;
+    };
+</script></body>`;
+         htmlPreview = htmlPreview.replace('</body>', overlayContent);
+      }
+
+      let injectedStyles = "";
+      let combinedScript = "";
+      let hasCombinedScripts = false;
+
       for (const [fname, fcontent] of Object.entries(files)) {
         if (fname.endsWith('.css')) {
           if (!htmlPreview.includes(fcontent.substring(0, 20))) {
-            const styleBlock = `\n<style>\n/* ${fname} */\n${fcontent}\n</style>\n`;
-            if (htmlPreview.includes('</head>')) {
-              htmlPreview = htmlPreview.replace('</head>', `${styleBlock}</head>`);
-            } else {
-              htmlPreview += styleBlock;
-            }
-          }
-        } else if (fname.endsWith('.js') && !['vite.config.js', 'tailwind.config.js', 'postcss.config.js', 'server.js', 'app.js'].includes(fname.toLowerCase())) {
-          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
-            const scriptBlock = `\n<script>\n// ${fname}\n${fcontent}\n</script>\n`;
-            if (htmlPreview.includes('</body>')) {
-              htmlPreview = htmlPreview.replace('</body>', `${scriptBlock}</body>`);
-            } else {
-              htmlPreview += scriptBlock;
-            }
+            injectedStyles += `\n<style>\n/* ${fname} */\n${fcontent}\n</style>\n`;
           }
         }
       }
+
+      for (const [fname, fcontent] of Object.entries(files)) {
+        if (fname.endsWith('.js') || fname.endsWith('.jsx') || fname.endsWith('.ts') || fname.endsWith('.tsx')) {
+          if (['vite.config.js', 'tailwind.config.js', 'postcss.config.js', 'server.js', 'app.js', 'components.json'].includes(fname.toLowerCase())) continue;
+          
+          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
+             if (isReact) {
+                hasCombinedScripts = true;
+                combinedScript += `\n/* --- ${fname} --- */\n`;
+                combinedScript += fcontent
+                   .replace(/import\s+.*?\s+from\s+['"]([\.@\/][a-zA-Z0-9_\-\/\.]+)['"];?/g, '') 
+                   .replace(/import\s+['"]([\.@\/][a-zA-Z0-9_\-\/\.]+)['"];?/g, '')
+                   .replace(/export\s+default\s+function\s+([a-zA-Z0-9_]+)/g, 'function $1\nwindow.App = $1;')
+                   .replace(/export\s+const\s+([a-zA-Z0-9_]+)/g, 'const $1')
+                   .replace(/export\s+default\s+([a-zA-Z0-9_]+);?/g, 'window.App = $1;')
+                   .replace(/export\s+\{\s*([a-zA-Z0-9_,\s]+)\s*\};?/g, '');
+             } else {
+                combinedScript += `\n<script>\n// ${fname}\n${fcontent}\n</script>\n`;
+             }
+          }
+        }
+      }
+
+      if (isReact && hasCombinedScripts) {
+         let renderCode = `\n/* --- Auto Render --- */\nimport React from 'react';\nimport { createRoot } from 'react-dom/client';\nconst ComponentToRender = window.App || (typeof App !== 'undefined' ? App : null);\nif (ComponentToRender) {\n  const root = createRoot(document.getElementById('root'));\n  root.render(<ComponentToRender />);\n}\n`;
+         combinedScript = `\n<script type="text/babel" data-type="module">\n${combinedScript}\n${renderCode}\n</script>\n`;
+      }
+
+      if (htmlPreview.includes('</head>')) {
+        htmlPreview = htmlPreview.replace('</head>', `${injectedStyles}</head>`);
+      } else {
+        htmlPreview += injectedStyles;
+      }
+
+      if (htmlPreview.includes('</body>')) {
+        htmlPreview = htmlPreview.replace('</body>', `${combinedScript}</body>`);
+      } else {
+        htmlPreview += combinedScript;
+      }
       
-      // Auto-inject Tailwind if missing but classes seem to be used
       if (!htmlPreview.includes('tailwindcss') && !htmlPreview.includes('tailwind.min.css') && htmlPreview.includes('class=')) {
         const tailwindCdn = `<script src="https://cdn.tailwindcss.com"></script>\n</head>`;
         if (htmlPreview.includes('</head>')) {
@@ -144,7 +264,7 @@ export default function WebsitePage() {
       }
     }
 
-    return { preview: htmlPreview || "<html><body><h2 style='font-family:sans-serif;color:white;padding:2rem;'>Backend or component code generated.</h2><p style='font-family:sans-serif;color:#888;padding:0 2rem;'>Check the Code tab to view the generated files. A full visual preview requires an index.html file.</p></body></html>", files };
+    return { preview: htmlPreview, files };
   };
 
   const loadHistory = async () => {
