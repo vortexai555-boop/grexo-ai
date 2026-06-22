@@ -104,9 +104,22 @@ export default function WebsitePage() {
       return { preview: text, files: { 'output.txt': text } };
     }
     
-    // Inject scripts/css into HTML preview if they are separate files and not already referenced inline?
-    // Doing true bundling here is complex, but we prioritize index.html
-    return { preview: htmlPreview || "<html><body><h1>Backend code generated, but no index.html was found!</h1><p>Check the Code tab to view the generated files.</p></body></html>", files };
+    // Inject scripts/css into HTML preview if they are separate files
+    if (htmlPreview) {
+      for (const [fname, fcontent] of Object.entries(files)) {
+        if (fname.endsWith('.css')) {
+          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
+            htmlPreview = htmlPreview.replace('</head>', `\n<style>\n/* ${fname} */\n${fcontent}\n</style>\n</head>`);
+          }
+        } else if (fname.endsWith('.js') && !['vite.config.js', 'tailwind.config.js', 'postcss.config.js', 'server.js', 'app.js'].includes(fname.toLowerCase())) {
+          if (!htmlPreview.includes(fcontent.substring(0, 20))) {
+            htmlPreview = htmlPreview.replace('</body>', `\n<script>\n// ${fname}\n${fcontent}\n</script>\n</body>`);
+          }
+        }
+      }
+    }
+
+    return { preview: htmlPreview || "<html><body><h2 style='font-family:sans-serif;color:white;padding:2rem;'>Backend or component code generated.</h2><p style='font-family:sans-serif;color:#888;padding:0 2rem;'>Check the Code tab to view the generated files. A full visual preview requires an index.html file.</p></body></html>", files };
   };
 
   const loadHistory = async () => {
