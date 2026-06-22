@@ -279,6 +279,36 @@ async def generate_text_free(messages: list) -> str:
         logger.exception("Free text generation failed: %s", e)
         raise e
 
+async def pollinations_chat(prompt_or_messages, retries: int = 1) -> str:
+    import httpx
+    import asyncio
+    
+    if isinstance(prompt_or_messages, str):
+        payload_messages = [{"role": "user", "content": prompt_or_messages}]
+    else:
+        payload_messages = prompt_or_messages
+
+    for attempt in range(retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                json_payload = {
+                    "messages": payload_messages,
+                    "model": "openai"
+                }
+                resp = await client.post("https://text.pollinations.ai/", json=json_payload)
+                resp.raise_for_status()
+                reply = resp.text
+                if not reply:
+                    return "No response from model."
+                return reply
+        except Exception as e:
+            if attempt < retries:
+                logger.warning("Pollinations AI error: %s. Retrying...", e)
+                await asyncio.sleep(1)
+            else:
+                logger.error("Pollinations AI failed after %d retries: %s", retries, e)
+                return "Sorry, the AI service is temporarily unavailable."
+
 from duckduckgo_search import DDGS
 
 async def web_search(query: str):
@@ -545,77 +575,85 @@ async def chat_send(
     current_date_info = "\n\nIMPORTANT: The current year and month is June 2026. Therefore, events from 2024, 2025, and 2026 are NOT in the future. You MUST use search tools to answer questions realistically about current events, net worths, and timelines up to June 2026 without claiming you don't have future data."
     
     try:
-        messages = [{"role": "system", "content": system + current_date_info}]
-        
-        for m in history[:-1]:
-            messages.append({
-                "role": "user" if m["role"] == "user" else "assistant",
-                "content": m["content"]
-            })
-            
-        user_content = []
-        if body.message:
-            user_content.append({"type": "text", "text": body.message})
-            
-        if body.files:
-            for file in body.files:
-                b64_data = file["data"]
-                if "," in b64_data:
-                    b64_data = b64_data.split(",", 1)[1]
-                mime = file.get("mime", "image/png")
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{b64_data}"}
-                })
-                
+        from typing import List
         if body.web_search:
+            search_text = "No results found."
             try:
                 search_results = await web_search(body.message)
                 if search_results:
-                    context = "Web Search Results:\n"
-                    for res in search_results:
-                        context += f"- {res.get('title', '')}: {res.get('body', '')}\n"
-                    user_content.append({"type": "text", "text": context})
+                    search_text = ""
+                    for i, res in enumerate(search_results[:5], 1):
+                        search_text += f"{res.get('title', '')}: {res.get('body', '')}\n"
             except Exception as search_err:
                 logger.error(f"Search error: {search_err}")
-
-        messages.append({"role": "user", "content": user_content})
-
-        # Convert multimodal messages to text-only for Pollinations
-        pollinations_messages = []
-        for m in messages[:-1]:
-            pollinations_messages.append(m)
-
-        final_user_text_parts = []
-        for item in user_content:
-            if item.get("type") == "text":
-                final_user_text_parts.append(item["text"])
-            elif item.get("type") == "image_url":
-                final_user_text_parts.append("[User attached an image]")
-        
-        pollinations_messages.append({"role": "user", "content": "\n".join(final_user_text_parts)})
-
-        import httpx
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            json_payload = {
-                "messages": pollinations_messages,
-                "model": "openai"
-            }
+                search_text = "Search failed."
             
-            resp = await client.post(
-                "https://text.pollinations.ai/",
-                json=json_payload
-            )
-            resp.raise_for_status()
-            reply = resp.text
+            history_text = "\n".join([f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}" for m in history[:-1]])
+            if not history_text:
+                history_text = "No previous history."
+                
+            prompt = f"""SYSTEM
 
-        if not reply:
-            reply = "No response from model."
+You are Grexo AI.
+
+Answer naturally.
+
+If search results are useful,
+use them.
+
+If they are unrelated,
+ignore them.
+
+Never hallucinate.
+
+Always answer clearly.
+
+----------------------------------------
+
+Conversation History:
+
+{history_text}
+
+----------------------------------------
+
+User Question:
+
+{body.message}
+
+----------------------------------------
+
+Search Results:
+
+{search_text}
+
+----------------------------------------
+
+Answer:"""
+            reply = await pollinations_chat(prompt)
+        else:
+            pollinations_messages = [{"role": "system", "content": "You are Grexo AI. Answer naturally. Current year is 2026. Current date is June 2026."}]
+            for m in history[:-1]:
+                pollinations_messages.append({
+                    "role": "user" if m["role"] == "user" else "assistant",
+                    "content": m["content"]
+                })
+            
+            final_user_text_parts = []
+            if body.message:
+                final_user_text_parts.append(body.message)
+            if body.files:
+                for file in body.files:
+                    final_user_text_parts.append("[User attached an image]")
+            pollinations_messages.append({
+                "role": "user",
+                "content": "\n".join(final_user_text_parts)
+            })
+            
+            reply = await pollinations_chat(pollinations_messages)
 
     except Exception as e:
         logger.exception("Text generation error: %s", e)
-        error_str = str(e)
-        reply = f"Error: {error_str}"
+        reply = "Sorry, the AI service is temporarily unavailable."
 
     assistant_msg = {
         "role": "assistant",
