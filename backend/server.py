@@ -300,7 +300,13 @@ async def pollinations_chat(prompt_or_messages, retries: int = 1) -> str:
                 reply = resp.text
                 if not reply:
                     return "No response from model."
-                return reply
+                
+                # Remove ad
+                reply = reply.split("Support Pollinations.AI:")[0]
+                reply = reply.split("🌸 Ad 🌸")[0]
+                reply = reply.replace("Powered by Pollinations.AI free text APIs.", "")
+                
+                return reply.strip()
         except Exception as e:
             if attempt < retries:
                 logger.warning("Pollinations AI error: %s. Retrying...", e)
@@ -316,7 +322,7 @@ async def web_search(query: str):
         def _search():
             from duckduckgo_search import DDGS
             with DDGS() as ddgs:
-                return list(ddgs.text(query, max_results=5))
+                return list(ddgs.text(query, backend="lite", max_results=5))
         return await asyncio.to_thread(_search)
     except Exception as e:
         logger.exception("search failed: %s", e)
@@ -587,49 +593,28 @@ async def chat_send(
             except Exception as search_err:
                 logger.error(f"Search error: {search_err}")
                 search_text = "Search failed."
-            
-            history_text = "\n".join([f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}" for m in history[:-1]])
-            if not history_text:
-                history_text = "No previous history."
                 
-            prompt = f"""SYSTEM
-
-You are Grexo AI.
-
-Answer naturally.
-
-If search results are useful,
-use them.
-
-If they are unrelated,
-ignore them.
-
-Never hallucinate.
-
-Always answer clearly.
-
-----------------------------------------
-
-Conversation History:
-
-{history_text}
-
-----------------------------------------
-
-User Question:
-
-{body.message}
-
-----------------------------------------
-
-Search Results:
-
-{search_text}
-
-----------------------------------------
-
-Answer:"""
-            reply = await pollinations_chat(prompt)
+            pollinations_messages = [{"role": "system", "content": f"You are Grexo AI. Answer naturally. If search results are useful, use them. If they are unrelated, ignore them. Never hallucinate. Always answer clearly.\n{current_date_info}"}]
+            for m in history[:-1]:
+                pollinations_messages.append({
+                    "role": "user" if m["role"] == "user" else "assistant",
+                    "content": m.get("content", "")
+                })
+            
+            final_user_text_parts = []
+            if body.message:
+                final_user_text_parts.append(f"User Question:\n{body.message}\n\nSearch Results:\n{search_text}")
+                
+            if body.files:
+                for file in body.files:
+                    final_user_text_parts.append("[User attached an image]")
+                    
+            pollinations_messages.append({
+                "role": "user",
+                "content": "\n".join(final_user_text_parts)
+            })
+            
+            reply = await pollinations_chat(pollinations_messages)
         else:
             pollinations_messages = [{"role": "system", "content": "You are Grexo AI. Answer naturally. Current year is 2026. Current date is June 2026."}]
             for m in history[:-1]:
