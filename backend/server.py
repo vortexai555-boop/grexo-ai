@@ -251,26 +251,22 @@ async def generate_text_free(messages: list, prefer_pollinations: bool = False) 
                 parts = []
                 
                 if isinstance(m["content"], str):
-                    parts.append({"text": m["content"]})
+                    parts.append(types.Part.from_text(text=m["content"]))
                 elif isinstance(m["content"], list):
                     for c in m["content"]:
                         if c.get("type") == "text":
-                            parts.append({"text": c["text"]})
+                            parts.append(types.Part.from_text(text=c["text"]))
                         elif c.get("type") == "image_url":
                             url = c["image_url"]["url"]
                             if url.startswith("data:"):
                                 mime, b64 = url.split(";", 1)
                                 mime = mime.replace("data:", "")
                                 b64 = b64.replace("base64,", "")
+                                import base64
                                 # Fix missing padding if any
                                 b64 += "=" * ((4 - len(b64) % 4) % 4)
-                                parts.append({
-                                    "inline_data": {
-                                        "mime_type": mime,
-                                        "data": b64
-                                    }
-                                })
-                gemini_messages.append({"role": role, "parts": parts})
+                                parts.append(types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime))
+                gemini_messages.append(types.Content(role=role, parts=parts))
             
             geminiConfig = {}
             if system_instruction:
