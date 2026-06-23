@@ -63,8 +63,8 @@ export default function WebsitePage() {
   const hasCode = files !== null;
 
   const handleCopy = () => {
-    if (files && files["index.html"]) {
-      const fullHtml = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${files["styles.css"]}</style>\n<script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body>\n${files["index.html"]}\n<script>${files["script.js"]}</script>\n</body>\n</html>`;
+    if (files && files["html"]) {
+      const fullHtml = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${files["css"]}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${files["html"]}\n<script>${files["js"]}</script>\n</body>\n</html>`;
       navigator.clipboard.writeText(fullHtml);
       toast.success("Source code copied to clipboard!");
     }
@@ -73,14 +73,15 @@ export default function WebsitePage() {
   const downloadZip = async () => {
     if (!files) return;
     const zip = new JSZip();
-    zip.file("index.html", files["index.html"]);
-    zip.file("styles.css", files["styles.css"]);
-    zip.file("script.js", files["script.js"]);
+    zip.file("index.html", files["html"] || "");
+    zip.file("styles.css", files["css"] || "");
+    zip.file("script.js", files["js"] || "");
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `grexo-site-${Date.now()}.zip`);
   };
 
-  const srcDoc = files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<style>${files["styles.css"]}</style>\n<script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body>\n${files["index.html"]}\n<script>(function(){try{${files["script.js"]}}catch(e){console.error(e)}})();</script>\n</body>\n</html>` : "";
+  const safeJs = (files && files["js"]) ? files["js"].replace(/<\/script>/gi, '<\\/script>') : "";
+  const srcDoc = files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>window.onerror = function(msg) { if(msg==='Script error.') return true; }; window.addEventListener('error', function(e) { if(e.message==='Script error.') { e.preventDefault(); e.stopImmediatePropagation(); } }, true);</script>\n<style>${files["css"] || ""}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${files["html"] || ""}\n<script>try { ${safeJs} } catch(e) {}</script>\n</body>\n</html>` : "";
   const widthClass = isFullScreen ? "w-full" : viewMode === "mobile" ? "w-[375px]" : viewMode === "tablet" ? "w-[768px]" : "w-full";
 
   return (
@@ -130,12 +131,12 @@ export default function WebsitePage() {
               <div className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-[#4B5563] font-bold">Source Code</div>
               
               {[
-                { id: "index.html", icon: FileCode2 },
-                { id: "styles.css", icon: Globe },
-                { id: "script.js", icon: FileText }
+                { id: "html", icon: FileCode2 },
+                { id: "css", icon: Globe },
+                { id: "js", icon: FileText }
               ].map(f => (
                 <button key={f.id} disabled={!hasCode} onClick={() => setActiveFile(f.id)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left w-full disabled:opacity-40 font-medium tracking-tight ${activeFile === f.id ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner" : "hover:bg-white/5 text-slate-400 border border-transparent"}`}>
-                  <f.icon size={16} className={activeFile === f.id ? "text-cyan-400" : "text-slate-500"} /> {f.id}
+                  <f.icon size={16} className={activeFile === f.id ? "text-cyan-400" : "text-slate-500"} /> {f.id === 'html' ? 'index.html' : f.id === 'css' ? 'styles.css' : 'script.js'}
                 </button>
               ))}
             </div>
