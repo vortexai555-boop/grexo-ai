@@ -248,11 +248,11 @@ async def generate_text_free(messages: list) -> str:
                 parts = []
                 
                 if isinstance(m["content"], str):
-                    parts.append(types.Part.from_text(text=m["content"]))
+                    parts.append(m["content"])
                 elif isinstance(m["content"], list):
                     for c in m["content"]:
                         if c.get("type") == "text":
-                            parts.append(types.Part.from_text(text=c["text"]))
+                            parts.append(c["text"])
                         elif c.get("type") == "image_url":
                             url = c["image_url"]["url"]
                             if url.startswith("data:"):
@@ -263,7 +263,7 @@ async def generate_text_free(messages: list) -> str:
                                 # Fix missing padding if any
                                 b64 += "=" * ((4 - len(b64) % 4) % 4)
                                 parts.append(types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime))
-                gemini_messages.append( types.Content(role=role, parts=parts ))
+                gemini_messages.append({"role": role, "parts": parts})
             
             geminiConfig = {}
             if system_instruction:
@@ -992,9 +992,11 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         }
         
         site_id = new_id("site")
+        name = description[:30] + ("..." if len(description) > 30 else "")
         rec = {
-            "id": site_id, "user_id": user_id, "description": description,
+            "id": site_id, "user_id": user_id, "description": description, "name": name,
             "site_type": site_type, "files": files, "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
         }
         await db.websites.insert_one(rec.copy())
         await db.website_jobs.update_one(
@@ -1029,6 +1031,160 @@ async def website_job_status(job_id: str, user=Depends(get_current_user)):
 async def list_websites(user=Depends(get_current_user)):
     return await db.websites.find({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0}).sort("created_at", -1).limit(40).to_list(40)
 
+
+@api.get("/website/{site_id}")
+async def get_website(site_id: str, user=Depends(get_current_user)):
+    doc = await db.websites.find_one({"id": site_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Website not found")
+    return doc
+
+class WebsiteUpdateIn(BaseModel):
+    name: Optional[str] = None
+    files: Optional[dict] = None
+    thumbnail_url: Optional[str] = None
+
+@api.put("/website/{site_id}")
+async def update_website(site_id: str, body: WebsiteUpdateIn, user=Depends(get_current_user)):
+    doc = await db.websites.find_one({"id": site_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Website not found")
+    updates = {"updated_at": now_utc().isoformat()}
+    if body.name is not None:
+        updates["name"] = body.name
+    if body.files is not None:
+        updates["files"] = body.files
+    if body.thumbnail_url is not None:
+        updates["thumbnail_url"] = body.thumbnail_url
+    await db.websites.update_one({"id": site_id, "user_id": user["user_id"]}, {"$set": updates})
+    return {"status": "ok"}
+
+@api.delete("/website/{site_id}")
+async def delete_website(site_id: str, user=Depends(get_current_user)):
+    res = await db.websites.delete_one({"id": site_id, "user_id": user["user_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Website not found")
+    return {"status": "ok"}
+
+@api.post("/website/{site_id}/duplicate")
+async def duplicate_website(site_id: str, user=Depends(get_current_user)):
+    doc = await db.websites.find_one({"id": site_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Website not found")
+    
+    new_id_str = new_id("site")
+    new_doc = doc.copy()
+    new_doc["id"] = new_id_str
+    new_doc["name"] = f"{new_doc.get('name', 'Website')} (Copy)"
+    new_doc["created_at"] = now_utc().isoformat()
+    new_doc["updated_at"] = new_doc["created_at"]
+    await db.websites.insert_one(new_doc)
+    return {"status": "ok", "site_id": new_id_str}
+
+class WebsiteChatIn(BaseModel):
+    prompt: str
+
+@api.post("/website/{site_id}/chat")
+async def chat_website(site_id: str, body: WebsiteChatIn, user=Depends(get_current_user)):
+    await require_credits(user, 3)
+    doc = await db.websites.find_one({"id": site_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Website not found")
+
+    job_id = new_id("job")
+    job = {
+        "id": job_id,
+        "user_id": user["user_id"],
+        "status": "pending",
+        "site_id": site_id,
+        "prompt": body.prompt,
+        "created_at": now_utc().isoformat(),
+    }
+    await db.website_jobs.insert_one(job.copy())
+    await deduct_credits(user["user_id"], 3)
+    asyncio.create_task(_run_website_chat_job(job_id, user["user_id"], site_id, body.prompt, doc.get("files", {})))
+    return {"job_id": job_id, "status": "pending"}
+
+async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt: str, current_files: dict):
+    try:
+        sys_prompt = SYSTEM_PROMPTS["website"] + "\n\nYou will receive the current files. Modify them based on the user's prompt. YOU MUST RETURN ALL THREE FILES completely, even if only one changed. Return ONLY XML blocks."
+        
+        current_code = f"Here is the current code:\n"
+        current_code += f"index.html:\n```html\n{current_files.get('html', '')}\n```\n\n"
+        current_code += f"styles.css:\n```css\n{current_files.get('css', '')}\n```\n\n"
+        current_code += f"script.js:\n```javascript\n{current_files.get('js', '')}\n```\n\n"
+        current_code += f"User Request: {prompt}"
+
+        messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": current_code}
+        ]
+        
+        out = await generate_text_free(messages)
+        
+        import re
+        parsed_files = {}
+        xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+        for m in xml_matches:
+            name = m.group(1).lower()
+            content = m.group(2).strip()
+            if content.startswith("```"):
+                content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
+            if "html" in name:
+                parsed_files["html"] = content
+            elif "css" in name:
+                parsed_files["css"] = content
+            elif "js" in name or "script" in name:
+                parsed_files["js"] = content
+                
+        if not parsed_files:
+            code_blocks = re.finditer(r'```[a-zA-Z]*\s*\n(.*?)```', out, re.DOTALL)
+            blocks = list(code_blocks)
+            if len(blocks) >= 3:
+                parsed_files["html"] = blocks[0].group(1).strip()
+                parsed_files["css"] = blocks[1].group(1).strip()
+                parsed_files["js"] = blocks[2].group(1).strip()
+            elif len(blocks) > 0:
+                html_code = blocks[0].group(1).strip()
+                parsed_files["html"] = html_code
+                import re as regex
+                style_match = regex.search(r'<style>(.*?)</style>', html_code, regex.DOTALL)
+                script_match = regex.search(r'<script>(.*?)</script>', html_code, regex.DOTALL)
+                parsed_files["css"] = style_match.group(1).strip() if style_match else current_files.get('css', '')
+                parsed_files["js"] = script_match.group(1).strip() if script_match else current_files.get('js', '')
+                if style_match or script_match:
+                     cleaned = regex.sub(r'<style>.*?</style>', '', html_code, flags=regex.DOTALL)
+                     cleaned = regex.sub(r'<script>.*?</script>', '', cleaned, flags=regex.DOTALL)
+                     parsed_files["html"] = cleaned
+
+        if not parsed_files:
+            raise ValueError("The generation model did not return a valid format.")
+            
+        final_files = {
+            "html": parsed_files.get("html", current_files.get("html", "")),
+            "css": parsed_files.get("css", current_files.get("css", "")),
+            "js": parsed_files.get("js", current_files.get("js", ""))
+        }
+        
+        await db.websites.update_one(
+            {"id": site_id, "user_id": user_id},
+            {"$set": {"files": final_files, "updated_at": now_utc().isoformat()}}
+        )
+        await db.website_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "done", "files": final_files, "completed_at": now_utc().isoformat()}},
+        )
+        await log_activity(user_id, "website", f"Edited website based on: {prompt[:80]}")
+    except Exception as e:
+        logger.exception("website chat job failed: %s", e)
+        error_msg = str(e)
+        if "JSONDecodeError" in str(type(e)):
+             error_msg = "The generation model did not return a valid format."
+        await db.website_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "error", "error": error_msg[:300], "completed_at": now_utc().isoformat()}},
+        )
+        await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": 3}})
 
 @api.get("/dashboard/summary")
 async def dashboard_summary(user=Depends(get_current_user)):
