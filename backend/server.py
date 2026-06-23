@@ -19,8 +19,6 @@ from pydantic import BaseModel, Field, EmailStr
 from google import genai
 from google.genai import types
 import base64
-import json
-import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -913,8 +911,7 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
     prompt = (
         f"Build a beautiful, modern, fully responsive {site_type} website. "
         f"Requirements: {description}. Use Tailwind via CDN in the HTML. Include responsive layouts. "
-        f"Return ONLY valid JSON containing 'files' -> 'index.html', 'styles.css', 'script.js'. "
-        f"Do not include any conversational text."
+        f"Return ONLY valid JSON containing 'files' -> 'index.html', 'styles.css', 'script.js' inside a ```json fenced block."
     )
     try:
         user_content_parts = [{"type": "text", "text": prompt}]
@@ -935,27 +932,23 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         ]
         out = await generate_text_free(messages)
         
-        # Robustly extract JSON ignoring AI markdown conversational filler
-        json_str = out
+        json_str = out.strip()
         if "```json" in out:
-            json_str = out.split("```json", 1)[1].split("```", 1)[0]
+            json_str = out.split("```json", 1)[1].split("```", 1)[0].strip()
         elif "```" in out:
-            json_str = out.split("```", 1)[1].split("```", 1)[0]
+            json_str = out.split("```", 1)[1].split("```", 1)[0].strip()
         else:
-            # Fallback: Extract from first '{' to last '}'
-            start_idx = out.find("{")
-            end_idx = out.rfind("}")
-            if start_idx != -1 and end_idx != -1 and end_idx >= start_idx:
-                json_str = out[start_idx:end_idx+1]
-                
-        json_str = json_str.strip()
-        
+            start = json_str.find('{')
+            end = json_str.rfind('}')
+            if start != -1 and end != -1:
+                json_str = json_str[start:end+1]
+            
+        import json
         try:
-            parsed_json = json.loads(json_str)
-            files = parsed_json.get("files", {})
+            files = json.loads(json_str).get("files", {})
         except json.JSONDecodeError as e:
-            logger.error("Failed to parse JSON for website. Raw output: %s", out)
-            raise Exception("The generation model did not return a valid JSON format.") from e
+            logger.error("JSON decode failed. String was: %s", json_str[:500])
+            raise ValueError("The generation model did not return a valid JSON format.") from e
         
         site_id = new_id("site")
         rec = {
@@ -968,15 +961,18 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
             {"$set": {"status": "done", "site_id": site_id, "files": files, "completed_at": now_utc().isoformat()}},
         )
         await log_activity(user_id, "website", description[:120])
-        
     except Exception as e:
         logger.exception("website job failed: %s", e)
+        error_msg = str(e)
+        if "JSONDecodeError" in str(type(e)):
+             error_msg = "The generation model did not return a valid JSON format."
         await db.website_jobs.update_one(
             {"id": job_id},
-            {"$set": {"status": "error", "error": str(e)[:300], "completed_at": now_utc().isoformat()}},
+            {"$set": {"status": "error", "error": error_msg[:300], "completed_at": now_utc().isoformat()}},
         )
         # Refund credits on failure
         await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": 3}})
+
 
 @api.get("/website/jobs/{job_id}")
 async def website_job_status(job_id: str, user=Depends(get_current_user)):
