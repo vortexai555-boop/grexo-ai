@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -9,10 +9,15 @@ import { ChatCircleDots, Clock, ArrowRight, Globe, Image as ImageIcon, Lightning
 export default function DashboardHome() {
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    api.get("/dashboard/summary").then((r) => setSummary(r.data)).catch(() => {});
-  }, []);
+    if (sessionStorage.getItem("savedPrompt")) {
+      navigate("/dashboard/chat", { replace: true });
+    } else {
+      api.get("/dashboard/summary").then((r) => setSummary(r.data)).catch(() => {});
+    }
+  }, [navigate]);
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
