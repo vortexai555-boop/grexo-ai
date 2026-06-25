@@ -27,6 +27,17 @@ export default function ChatPage() {
   const [attachments, setAttachments] = useState([]);
   const scrollRef = useRef(null);
 
+  useEffect(() => {
+    const savedPrompt = sessionStorage.getItem("savedPrompt");
+    if (savedPrompt) {
+      sessionStorage.removeItem("savedPrompt");
+      setInput(savedPrompt);
+      setTimeout(() => {
+        document.querySelector('[data-testid="chat-send"]')?.click();
+      }, 300);
+    }
+  }, []);
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
