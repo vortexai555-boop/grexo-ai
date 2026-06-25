@@ -41,9 +41,9 @@ JWT_ALG = os.environ.get("JWT_ALG", "HS256")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@grexo.ai")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "GrexoAdmin@2026")
 
-FREE_CREDITS = 100
+FREE_CREDITS = 50
 PRO_CREDITS = 2000
-ENTERPRISE_CREDITS = 99999
+ENTERPRISE_CREDITS = 55555
 
 CHAT_MODEL = ("anthropic", "claude-sonnet-4-5-20250929")
 IMAGE_MODEL = "imagen-4.0-fast-generate-001"
