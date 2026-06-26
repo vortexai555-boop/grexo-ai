@@ -29,3 +29,4 @@ duckduckgo-search
 openai
 google-generativeai
 google-genai
+psutil
