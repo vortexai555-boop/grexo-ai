@@ -11,7 +11,7 @@ from typing import List, Optional, Dict, Any
 import jwt
 import httpx
 import bcrypt
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Cookie, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Cookie, Header, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
@@ -19,16 +19,32 @@ from pydantic import BaseModel, Field, EmailStr
 from google import genai
 from google.genai import types
 import base64
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 import hashlib
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 
-def get_encryption_key():
+def get_legacy_key():
     secret = os.environ.get("JWT_SECRET", "dev-secret-fallback-12345")
     key = hashlib.sha256(secret.encode()).digest()
     return base64.urlsafe_b64encode(key)
 
-cipher_suite = Fernet(get_encryption_key())
+def get_strong_key():
+    secret = os.environ.get("JWT_SECRET", "dev-secret-fallback-12345")
+    salt = os.environ.get("ENCRYPTION_SALT", "static-salt-for-compat").encode()
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = kdf.derive(secret.encode())
+    return base64.urlsafe_b64encode(key)
+
+cipher_suite = MultiFernet([Fernet(get_strong_key()), Fernet(get_legacy_key())])
 
 def encrypt_key(plain_key: str) -> str:
     if not plain_key:
@@ -158,30 +174,84 @@ def verify_pw(pw: str, hashed: str) -> bool:
     except Exception: return False
 
 def make_jwt(user_id: str) -> str:
-    payload = {"sub": user_id, "iat": int(now_utc().timestamp()), "exp": int((now_utc() + timedelta(days=36500)).timestamp())}
+    payload = {
+        "sub": user_id, 
+        "iat": int(now_utc().timestamp()), 
+        "exp": int((now_utc() + timedelta(days=7)).timestamp()),
+        "iss": "grexo-ai",
+        "aud": "grexo-users"
+    }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
 def decode_jwt(token: str) -> Optional[str]:
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG], options={"verify_aud": False, "verify_iss": False})
         return payload.get("sub")
     except Exception:
         return None
 
+import time
+
+def validate_secrets():
+    jwt_secret = os.environ.get("JWT_SECRET")
+    if not jwt_secret or len(jwt_secret) < 32:
+        logger.warning("WARNING: JWT_SECRET is missing or weak. Please set a 32+ character secret in .env.")
+    if not os.environ.get("ENCRYPTION_SALT"):
+        logger.warning("WARNING: ENCRYPTION_SALT is missing. Using fallback salt.")
+
+# Simple TTL Cache for millions of users optimization
+class TTLCache:
+    def __init__(self, ttl_seconds=300):
+        self.cache = {}
+        self.ttl = ttl_seconds
+
+    def get(self, key):
+        if key in self.cache:
+            val, exp = self.cache[key]
+            if time.time() < exp:
+                return val
+            else:
+                del self.cache[key]
+        return None
+
+    def set(self, key, value):
+        self.cache[key] = (value, time.time() + self.ttl)
+        
+    def delete(self, key):
+        if key in self.cache:
+            del self.cache[key]
+
+user_cache = TTLCache(ttl_seconds=120)
+session_cache = TTLCache(ttl_seconds=120)
+
 async def get_current_user(request: Request, authorization: Optional[str] = Header(None), session_token: Optional[str] = Cookie(None)) -> Dict[str, Any]:
     user_id: Optional[str] = None
+    
+    # Anti-CSRF Origin Check for cookie-based auth
+    if not authorization and session_token:
+        origin = request.headers.get("Origin")
+        if origin and origin not in os.environ.get("CORS_ORIGINS", "*").split(","):
+            if os.environ.get("CORS_ORIGINS", "*") != "*":
+                raise HTTPException(status_code=403, detail="CSRF check failed: Invalid Origin")
+
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1]
         user_id = decode_jwt(token)
         if not user_id:
-            sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+            sess = session_cache.get(token)
+            if not sess:
+                sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+                if sess: session_cache.set(token, sess)
             if sess:
                 exp = sess["expires_at"]
                 if isinstance(exp, str): exp = datetime.fromisoformat(exp)
                 if exp.tzinfo is None: exp = exp.replace(tzinfo=timezone.utc)
                 if exp >= now_utc(): user_id = sess["user_id"]
     if not user_id and session_token:
-        sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
+        sess = session_cache.get(session_token)
+        if not sess:
+            sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
+            if sess: session_cache.set(session_token, sess)
         if sess:
             exp = sess["expires_at"]
             if isinstance(exp, str): exp = datetime.fromisoformat(exp)
@@ -189,7 +259,12 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             if exp >= now_utc(): user_id = sess["user_id"]
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+        
+    user = user_cache.get(user_id)
+    if not user:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+        if user: user_cache.set(user_id, user)
+        
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
@@ -218,11 +293,76 @@ async def require_credits(user: Dict[str, Any], cost: int = 1):
 async def deduct_credits(user_id: str, cost: int = 1):
     await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": -cost}})
 
-async def log_activity(user_id: str, kind: str, summary: str):
+async def log_activity(user_id: str, kind: str, summary: str, request: Optional[Request] = None):
+    ip_addr = "unknown"
+    user_agent = "unknown"
+    if request:
+        ip_addr = request.headers.get("X-Forwarded-For", request.client.host if request.client else "127.0.0.1").split(",")[0]
+        user_agent = request.headers.get("User-Agent", "unknown")
+    
     await db.activity.insert_one({
         "id": new_id("act"), "user_id": user_id, "kind": kind,
         "summary": summary[:200], "created_at": now_utc().isoformat(),
+        "ip_address": ip_addr, "user_agent": user_agent
     })
+
+async def log_abuse(ip: str, email: str, reason: str):
+    await db.abuse_logs.insert_one({
+        "ip": ip, "email": email, "reason": reason, "created_at": now_utc().isoformat()
+    })
+
+async def enqueue_job(task_type: str, payload: dict):
+    await db.jobs_queue.insert_one({
+        "type": task_type,
+        "payload": payload,
+        "status": "pending",
+        "created_at": now_utc().isoformat(),
+        "retries": 0
+    })
+
+async def process_queue():
+    while True:
+        try:
+            job = await db.jobs_queue.find_one_and_update(
+                {"status": "pending"},
+                {"$set": {"status": "processing", "started_at": now_utc().isoformat()}},
+                sort=[("created_at", 1)]
+            )
+            if job:
+                # Simulate processing based on job type
+                await asyncio.sleep(0.5)
+                await db.jobs_queue.update_one({"_id": job["_id"]}, {"$set": {"status": "completed", "completed_at": now_utc().isoformat()}})
+            else:
+                await asyncio.sleep(5)
+        except Exception as e:
+            logger.error(f"Queue processing error: {e}")
+            await asyncio.sleep(5)
+
+rate_limit_cache = TTLCache(ttl_seconds=60) # 1 minute window
+RATE_LIMIT_MAX = 300 # 300 req per minute per IP
+
+class SecurityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # 1. Rate Limiting (in-memory sliding window approximation)
+        ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "127.0.0.1").split(",")[0]
+        count = rate_limit_cache.get(ip) or 0
+        if count >= RATE_LIMIT_MAX:
+            return JSONResponse(status_code=429, content={"detail": "Too Many Requests. Rate limit exceeded."})
+        rate_limit_cache.set(ip, count + 1)
+        
+        # 2. Add security headers
+        response = await call_next(request)
+        
+        # HTTPS Enforcement & Strict Transport Security
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # XSS Protection
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # CSP Headers
+        response.headers["Content-Security-Policy"] = "default-src 'self'; connect-src 'self' https: wss:; img-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        
+        return response
 
 
 def detect_image_mime(b64: str) -> str:
@@ -322,7 +462,7 @@ async def gen_image(prompt: str, aspect_ratio: str = "1:1", files_data: list = N
 
 # ---- Auth: JWT ----
 @api.post("/auth/signup")
-async def signup(data: SignupIn):
+async def signup(data: SignupIn, request: Request, background_tasks: BackgroundTasks):
     if await db.users.find_one({"email": data.email.lower()}, {"_id": 0}):
         raise HTTPException(status_code=400, detail="Email already registered")
     user_id = new_id("user")
@@ -334,15 +474,21 @@ async def signup(data: SignupIn):
     }
     await db.users.insert_one(doc)
     token = make_jwt(user_id)
+    background_tasks.add_task(log_activity, user_id, "signup", "User signed up", request)
     return {"token": token, "user": {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}}
 
 @api.post("/auth/login")
-async def login(data: LoginIn):
+async def login(data: LoginIn, request: Request, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": data.email.lower()}, {"_id": 0})
+    ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "127.0.0.1").split(",")[0]
+    
     if not user or not user.get("password_hash") or not verify_pw(data.password, user["password_hash"]):
+        background_tasks.add_task(log_abuse, ip, data.email.lower(), "Failed login attempt")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    
     token = make_jwt(user["user_id"])
     user.pop("password_hash", None)
+    background_tasks.add_task(log_activity, user["user_id"], "login", "Successful login", request)
     return {"token": token, "user": user}
 
 @api.post("/auth/forgot")
@@ -1679,6 +1825,8 @@ async def root(): return {"app": "GREXO AI", "ok": True}
 
 @app.on_event("startup")
 async def seed_admin():
+    validate_secrets()
+    asyncio.create_task(process_queue())
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()}, {"_id": 0})
     if not existing:
         await db.users.insert_one({
@@ -1704,6 +1852,7 @@ async def shutdown_db():
     client.close()
 
 app.include_router(api)
+app.add_middleware(SecurityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
