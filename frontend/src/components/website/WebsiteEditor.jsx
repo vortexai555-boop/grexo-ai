@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Globe, FileCode2, FileText, Monitor, Tablet, Smartphone, Download, Copy, Maximize2, Minimize2, Play, Square, ArrowLeft, Edit2, Check } from "lucide-react";
+import { 
+  Globe, FileCode2, FileText, Monitor, Tablet, Smartphone, 
+  Download, Copy, Maximize2, Minimize2, ArrowLeft, Edit2, 
+  Check, LayoutPanelLeft, Play, Square, Terminal, X,
+  FolderOpen, ChevronRight, ChevronDown, Wand2, Search,
+  Settings, CheckCircle2, CircleDashed, FileJson
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import Editor from "@monaco-editor/react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import api from "@/lib/api";
@@ -15,15 +24,23 @@ export default function WebsiteEditor({
   onUpdateFiles, 
   onChat 
 }) {
-  const [activeFile, setActiveFile] = useState("preview");
+  const [activeFile, setActiveFile] = useState("html");
+  const [openFiles, setOpenFiles] = useState(["html", "css", "js"]);
   const [viewMode, setViewMode] = useState("desktop");
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
   const [files, setFiles] = useState(project?.files || { html: "", css: "", js: "" });
+  const [sidebarTab, setSidebarTab] = useState("explorer"); // explorer, ai, search
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(project?.name || "");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(true);
+  const [bottomPanelTab, setBottomPanelTab] = useState("console");
+  const [consoleLogs, setConsoleLogs] = useState([]);
+  
+  const [folderOpen, setFolderOpen] = useState(true);
 
   useEffect(() => {
     if (project?.files) setFiles(project.files);
@@ -40,6 +57,23 @@ export default function WebsiteEditor({
     return () => clearTimeout(timer);
   }, [files, project?.id, project?.files, onUpdateFiles]);
 
+  // Console message handler from iframe
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'THUMBNAIL' && event.data.data) {
+        if (project && project.thumbnail_url !== event.data.data) {
+          api.put(`/website/${project.id}`, { thumbnail_url: event.data.data }).catch(console.error);
+          project.thumbnail_url = event.data.data;
+        }
+      }
+      if (event.data && event.data.type === 'CONSOLE') {
+        setConsoleLogs(prev => [...prev, { type: event.data.logType, msg: event.data.msg, time: new Date() }]);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [project]);
+
   const handleSaveName = async () => {
     if (!editName.trim()) return;
     try {
@@ -54,7 +88,7 @@ export default function WebsiteEditor({
 
   const handleCopy = () => {
     if (files && files["html"]) {
-      const fullHtml = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${files["css"]}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${files["html"]}\n<script>${files["js"]}</script>\n</body>\n</html>`;
+      const fullHtml = getFullHtml();
       navigator.clipboard.writeText(fullHtml);
       toast.success("Source code copied to clipboard!");
     }
@@ -81,155 +115,339 @@ export default function WebsiteEditor({
     }
   };
 
-  const safeJs = (files && files["js"]) ? files["js"].replace(/<\/script>/gi, '<\\/script>') : "";
-  const srcDoc = files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>window.onerror = function(msg) { if(msg==='Script error.') return true; }; window.addEventListener('error', function(e) { if(e.message==='Script error.') { e.preventDefault(); e.stopImmediatePropagation(); } }, true);</script>\n<style>${files["css"] || ""}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>\n<script>\n  setTimeout(() => {\n    if (window.html2canvas) {\n      window.html2canvas(document.body, { scale: 0.5, useCORS: true }).then(canvas => {\n        window.parent.postMessage({ type: 'THUMBNAIL', data: canvas.toDataURL('image/jpeg', 0.5) }, '*');\n      }).catch(e => console.error(e));\n    }\n  }, 2000);\n</script>\n</head>\n<body>\n${files["html"] || ""}\n<script>try { ${safeJs} } catch(e) {}</script>\n</body>\n</html>` : "";
-  const widthClass = isFullScreen ? "w-full" : viewMode === "mobile" ? "w-[375px]" : viewMode === "tablet" ? "w-[768px]" : "w-full";
+  const closeFile = (e, fileId) => {
+    e.stopPropagation();
+    const newOpenFiles = openFiles.filter(f => f !== fileId);
+    setOpenFiles(newOpenFiles);
+    if (activeFile === fileId) {
+      setActiveFile(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1] : null);
+    }
+  };
 
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data && event.data.type === 'THUMBNAIL' && event.data.data) {
-        if (project && project.thumbnail_url !== event.data.data) {
-          api.put(`/website/${project.id}`, { thumbnail_url: event.data.data }).catch(console.error);
-          project.thumbnail_url = event.data.data;
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [project]);
+  const openFile = (fileId) => {
+    if (!openFiles.includes(fileId)) {
+      setOpenFiles([...openFiles, fileId]);
+    }
+    setActiveFile(fileId);
+  };
+
+  const getFullHtml = () => {
+    return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${files["css"]}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${files["html"]}\n<script>${files["js"]}</script>\n</body>\n</html>`;
+  };
+
+  const safeJs = (files && files["js"]) ? files["js"].replace(/<\/script>/gi, '<\\/script>') : "";
+  const srcDoc = files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>\n  window.onerror = function(msg) { window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg }, '*'); return true; };\n  const originalConsoleLog = console.log;\n  console.log = function(...args) { originalConsoleLog(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'log', msg: args.join(' ') }, '*'); };\n  const originalConsoleError = console.error;\n  console.error = function(...args) { originalConsoleError(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg: args.join(' ') }, '*'); };\n</script>\n<style>${files["css"] || ""}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>\n<script>\n  setTimeout(() => {\n    if (window.html2canvas) {\n      window.html2canvas(document.body, { scale: 0.5, useCORS: true }).then(canvas => {\n        window.parent.postMessage({ type: 'THUMBNAIL', data: canvas.toDataURL('image/jpeg', 0.5) }, '*');\n      }).catch(e => console.error(e));\n    }\n  }, 2000);\n</script>\n</head>\n<body>\n${files["html"] || ""}\n<script>try { ${safeJs} } catch(e) { console.error(e); }</script>\n</body>\n</html>` : "";
+
+  const fileConfigs = {
+    "html": { icon: FileCode2, name: "index.html", lang: "html", color: "text-orange-400" },
+    "css": { icon: Globe, name: "styles.css", lang: "css", color: "text-blue-400" },
+    "js": { icon: FileText, name: "script.js", lang: "javascript", color: "text-yellow-400" },
+    "json": { icon: FileJson, name: "package.json", lang: "json", color: "text-green-400" }
+  };
+
+  const getLanguage = (id) => fileConfigs[id]?.lang || "plaintext";
 
   return (
-    <div className={`flex flex-col text-gray-200 overflow-hidden ${isFullScreen ? 'fixed inset-0 z-[100] bg-[#07080d]' : 'h-full bg-transparent p-6 lg:p-10'}`}>
+    <div className={`flex flex-col text-gray-200 overflow-hidden font-sans ${isFullScreen ? 'fixed inset-0 z-[100] bg-[#111111]' : 'h-full bg-transparent'}`}>
       
-      {!isFullScreen && (
-        <div className="flex items-center justify-between mb-6 shrink-0">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack} className="text-slate-400 hover:text-white rounded-full">
-              <ArrowLeft size={20} />
-            </Button>
-            {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <Input 
-                  value={editName} 
-                  onChange={e => setEditName(e.target.value)} 
-                  className="h-8 bg-[#0d0e12] border-white/10 text-white w-64"
-                  autoFocus
-                  onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-                />
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-400 hover:text-green-300" onClick={handleSaveName}>
-                  <Check size={16} />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingName(true)}>
-                <h1 className="text-2xl font-medium tracking-tight text-white">
-                  {project?.name || "Untitled Project"}
-                </h1>
-                <Edit2 size={14} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            )}
-          </div>
-          <div className="text-xs text-slate-500 font-mono">ID: {project?.id}</div>
-        </div>
-      )}
-
-      <div className={`flex flex-1 min-h-0 ${isFullScreen ? '' : ''}`}>
-        {/* Sidebar */}
-        {!isFullScreen && (
-          <div className="w-80 shrink-0 border border-white/10 bg-[#0d0e12] rounded-l-2xl flex flex-col h-full z-10 transition-all shadow-xl shadow-black/20 overflow-hidden">
-            
-            <div className="p-4 border-b border-white/5 flex flex-col gap-3 bg-[#111216]">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">AI Assistant</div>
-              <Textarea 
-                placeholder="Ask AI to modify this website..." 
-                className="w-full h-28 bg-[#07080A] text-gray-200 border-white/10 focus-visible:ring-cyan-500 resize-none rounded-xl text-sm"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                disabled={isChatting}
-              />
-              <Button onClick={handleChat} disabled={!chatInput.trim() || isChatting} className="w-full h-10 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-all font-medium">
-                {isChatting ? "Generating Edit..." : "Apply AI Edit"}
-              </Button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
-              <div className="px-3 pt-3 pb-2 text-[10px] uppercase tracking-widest text-[#4B5563] font-bold">Workspace</div>
-              
-              <button onClick={() => setActiveFile("preview")} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left w-full font-medium tracking-tight ${activeFile === "preview" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner" : "hover:bg-white/5 text-slate-400 border border-transparent"}`}>
-                <Monitor size={16} className={activeFile === "preview" ? "text-cyan-400" : "text-slate-500"} /> Live Preview
-              </button>
-
-              <div className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-[#4B5563] font-bold">Source Code</div>
-              
-              {[
-                { id: "html", icon: FileCode2 },
-                { id: "css", icon: Globe },
-                { id: "js", icon: FileText }
-              ].map(f => (
-                <button key={f.id} onClick={() => setActiveFile(f.id)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left w-full font-medium tracking-tight ${activeFile === f.id ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner" : "hover:bg-white/5 text-slate-400 border border-transparent"}`}>
-                  <f.icon size={16} className={activeFile === f.id ? "text-cyan-400" : "text-slate-500"} /> {f.id === 'html' ? 'index.html' : f.id === 'css' ? 'styles.css' : 'script.js'}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Main Area */}
-        <div className={`flex flex-col min-w-0 flex-1 relative ${isFullScreen ? 'h-full bg-[#07080d]' : 'border-y border-r border-white/10 rounded-r-2xl overflow-hidden bg-[#0a0a0f] shadow-2xl relative shadow-black/40'}`}>
+      {/* IDE Top Nav / Title Bar */}
+      <div className="h-12 bg-[#18181b] border-b border-white/5 flex items-center justify-between px-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={onBack} className="text-slate-400 hover:text-white rounded-md h-8 w-8 hover:bg-white/5">
+            <ArrowLeft size={16} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`text-slate-400 hover:text-white rounded-md h-8 w-8 hover:bg-white/5 ${isSidebarOpen ? 'bg-white/5' : ''}`}>
+            <LayoutPanelLeft size={16} />
+          </Button>
+          <div className="h-4 w-px bg-white/10 mx-1" />
           
-          <div className={`h-14 border-b border-white/10 bg-[#111216]/90 backdrop-blur flex items-center justify-between px-5 shrink-0 z-20 ${isFullScreen ? 'absolute top-0 w-full left-0 right-0' : ''}`}>
-            
-            {/* Viewport Toggles */}
-            <div className={`flex bg-black/40 rounded-lg border border-white/5 p-1`}>
-              {["desktop", "tablet", "mobile"].map(mode => {
-                const Icon = mode === "desktop" ? Monitor : mode === "tablet" ? Tablet : Smartphone;
-                return (
-                  <button key={mode} onClick={() => setViewMode(mode)} title={mode} className={`p-1.5 rounded-md transition-all ${viewMode === mode ? "bg-[#1f2334] text-cyan-400 shadow-sm border border-white/5" : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}`}>
-                    <Icon size={16} />
-                  </button>
-                )
-              })}
+          {isEditingName ? (
+            <div className="flex items-center gap-2 ml-1">
+              <Input 
+                value={editName} 
+                onChange={e => setEditName(e.target.value)} 
+                className="h-7 bg-[#27272a] border-white/10 text-white w-48 text-sm px-2 focus-visible:ring-1 focus-visible:ring-cyan-500 rounded-md"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+              />
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-green-400 hover:text-green-300 hover:bg-white/5" onClick={handleSaveName}>
+                <Check size={14} />
+              </Button>
             </div>
+          ) : (
+            <div className="flex items-center gap-2 group cursor-pointer ml-2" onClick={() => setIsEditingName(true)}>
+              <span className="text-sm font-medium text-slate-200 tracking-wide">
+                {project?.name || "Untitled Project"}
+              </span>
+              <Edit2 size={12} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+        </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1">
-              {isChatting && <div className="text-xs text-cyan-400 mr-3 animate-pulse">AI is editing...</div>}
-              <Button size="sm" variant="ghost" onClick={handleCopy} className="text-slate-400 hover:text-white h-8 hover:bg-white/5 px-2.5" title="Copy HTML/CSS/JS">
-                <Copy size={16} />
-                <span className="hidden sm:inline ml-2 text-xs font-medium tracking-wide">Copy Code</span>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={downloadZip} className="text-slate-400 hover:text-white h-8 hover:bg-white/5 px-2.5" title="Download Source (.zip)">
-                <Download size={16} />
-                <span className="hidden sm:inline ml-2 text-xs font-medium tracking-wide">Download ZIP</span>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsFullScreen(!isFullScreen)} className={`${isFullScreen ? 'text-cyan-400 hover:text-cyan-300 bg-cyan-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'} h-8 px-2.5 ml-1`} title="Toggle Full Screen">
-                {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </Button>
-            </div>
+        <div className="flex items-center gap-1.5">
+          {isChatting && <div className="text-xs text-cyan-400 mr-2 flex items-center gap-1"><CircleDashed size={14} className="animate-spin" /> AI Working...</div>}
+          
+          {/* Viewport Toggles */}
+          <div className="flex bg-[#27272a] rounded-md p-0.5 border border-white/5 mr-2">
+            {["desktop", "tablet", "mobile"].map(mode => {
+              const Icon = mode === "desktop" ? Monitor : mode === "tablet" ? Tablet : Smartphone;
+              return (
+                <button key={mode} onClick={() => setViewMode(mode)} title={mode} className={`p-1.5 rounded-sm transition-colors ${viewMode === mode ? "bg-[#3f3f46] text-white shadow-sm" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>
+                  <Icon size={14} />
+                </button>
+              )
+            })}
           </div>
 
-          <div className="flex-1 relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#131722] via-[#0a0a0f] to-[#0a0a0f]">
-            {activeFile === "preview" ? (
-              <AnimatePresence mode="wait">
-                <motion.div key="preview" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className={`absolute inset-0 w-full h-full flex items-center justify-center ${isFullScreen ? 'p-0 pt-14' : 'p-4 pb-0 opacity-100'}`}>
-                  <div className={`h-full bg-white shadow-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${widthClass} ${viewMode !== 'desktop' && !isFullScreen ? 'rounded-[2rem] border-[10px] border-[#1f2334] mb-4 origin-bottom shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] ring-1 ring-white/10' : 'rounded-t-xl mb-0 shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.5)]'}`}>
-                    <iframe title="live-preview" srcDoc={srcDoc} className="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-            ) : (
-              <div className="absolute inset-0 pt-2 bg-[#1e1e1e]">
-                <textarea
-                  className="w-full h-full bg-[#1e1e1e] text-white p-4 font-mono text-sm resize-none outline-none"
-                  value={files[activeFile] || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFiles(f => ({ ...f, [activeFile]: val }));
-                  }}
-                  spellCheck={false}
-                />
-              </div>
-            )}
+          <Button size="sm" variant="ghost" onClick={handleCopy} className="text-slate-300 hover:text-white h-8 hover:bg-white/10 bg-white/5 px-3 rounded-md" title="Copy HTML/CSS/JS">
+            <Copy size={14} className="mr-2" /> <span className="text-xs font-medium">Copy</span>
+          </Button>
+          <Button size="sm" variant="ghost" onClick={downloadZip} className="text-slate-300 hover:text-white h-8 hover:bg-white/10 bg-white/5 px-3 rounded-md" title="Download Source (.zip)">
+            <Download size={14} className="mr-2" /> <span className="text-xs font-medium">Export</span>
+          </Button>
+          {!isFullScreen && (
+            <Button size="sm" variant="ghost" onClick={() => setIsFullScreen(true)} className="text-cyan-400 hover:text-cyan-300 h-8 hover:bg-white/5 px-2.5 ml-1 rounded-md" title="Full Screen IDE">
+              <Maximize2 size={14} />
+            </Button>
+          )}
+          {isFullScreen && (
+            <Button size="sm" variant="ghost" onClick={() => setIsFullScreen(false)} className="text-slate-400 hover:text-white h-8 hover:bg-white/5 px-2.5 ml-1 rounded-md" title="Exit Full Screen">
+              <Minimize2 size={14} />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Main IDE Body */}
+      <div className="flex-1 flex min-h-0 bg-[#1e1e1e]">
+        <ResizablePanelGroup direction="horizontal">
+          
+          {/* Sidebar */}
+          {isSidebarOpen && (
+            <>
+              <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-[#18181b] flex flex-col border-r border-white/5">
+                <div className="flex h-10 border-b border-white/5">
+                  <button onClick={() => setSidebarTab('explorer')} className={`flex-1 flex justify-center items-center ${sidebarTab === 'explorer' ? 'text-white border-b-2 border-cyan-500 bg-white/5' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <FolderOpen size={16} />
+                  </button>
+                  <button onClick={() => setSidebarTab('ai')} className={`flex-1 flex justify-center items-center ${sidebarTab === 'ai' ? 'text-white border-b-2 border-cyan-500 bg-white/5' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <Wand2 size={16} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  {sidebarTab === 'explorer' && (
+                    <div className="p-2">
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-2">Explorer</div>
+                      <div 
+                        className="flex items-center gap-1 text-sm font-medium text-slate-300 hover:text-white cursor-pointer px-1 py-1 rounded hover:bg-white/5 transition-colors"
+                        onClick={() => setFolderOpen(!folderOpen)}
+                      >
+                        {folderOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+                        {project?.name || "project"}
+                      </div>
+                      
+                      <AnimatePresence>
+                        {folderOpen && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }} 
+                            animate={{ height: "auto", opacity: 1 }} 
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden pl-4 mt-1 flex flex-col gap-0.5"
+                          >
+                            {["html", "css", "js"].map(f => {
+                              const conf = fileConfigs[f];
+                              return (
+                                <div 
+                                  key={f}
+                                  onClick={() => openFile(f)}
+                                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors ${activeFile === f ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+                                >
+                                  <conf.icon size={14} className={conf.color} />
+                                  <span>{conf.name}</span>
+                                </div>
+                              )
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  {sidebarTab === 'ai' && (
+                    <div className="p-4 flex flex-col h-full gap-4">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest">AI Assistant</div>
+                      <div className="flex-1 bg-[#09090b] rounded-lg border border-white/5 p-3 flex flex-col">
+                        <div className="flex-1 text-sm text-slate-400 flex flex-col justify-end">
+                          <p className="mb-2">I am ready to help you modify this website. Describe the changes you want below.</p>
+                        </div>
+                        <div className="mt-4 flex flex-col gap-2">
+                          <Textarea 
+                            placeholder="Add a dark mode toggle to the navbar..." 
+                            className="w-full bg-[#18181b] text-sm text-gray-200 border-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500 resize-none min-h-[80px]"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            disabled={isChatting}
+                          />
+                          <Button size="sm" onClick={handleChat} disabled={!chatInput.trim() || isChatting} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium">
+                            {isChatting ? "Generating Edit..." : "Generate Code"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="bg-transparent hover:bg-cyan-500/50 transition-colors w-1" />
+            </>
+          )}
+
+          {/* Main Editor & Preview Area */}
+          <ResizablePanel defaultSize={80} className="flex flex-col bg-[#1e1e1e]">
+            <ResizablePanelGroup direction="vertical">
+              
+              {/* Top: Editor + Preview */}
+              <ResizablePanel defaultSize={75} className="flex">
+                <ResizablePanelGroup direction="horizontal">
+                  
+                  {/* Editor View */}
+                  <ResizablePanel defaultSize={50} className="flex flex-col bg-[#1e1e1e] border-r border-white/5 min-w-[200px]">
+                    <div className="flex h-10 bg-[#18181b] border-b border-white/5 items-center overflow-x-auto hide-scrollbar">
+                      {openFiles.map(f => {
+                        const conf = fileConfigs[f];
+                        return (
+                          <div 
+                            key={f} 
+                            onClick={() => setActiveFile(f)}
+                            className={`flex items-center gap-2 h-full px-4 text-sm border-r border-white/5 cursor-pointer min-w-[120px] max-w-[200px] group transition-colors ${activeFile === f ? 'bg-[#1e1e1e] text-white border-t-2 border-t-cyan-500' : 'bg-[#18181b] text-slate-400 hover:bg-[#27272a]'}`}
+                          >
+                            <conf.icon size={14} className={conf.color} />
+                            <span className="truncate flex-1">{conf.name}</span>
+                            <div 
+                              onClick={(e) => closeFile(e, f)}
+                              className={`p-0.5 rounded-md hover:bg-white/10 ${activeFile === f ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                            >
+                              <X size={14} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="h-6 bg-[#1e1e1e] flex items-center px-4 text-xs text-slate-500 gap-2 border-b border-white/5 shrink-0">
+                      <span>{project?.name || "project"}</span> <ChevronRight size={10} /> <span>{fileConfigs[activeFile]?.name || ""}</span>
+                    </div>
+                    <div className="flex-1 relative">
+                      {activeFile ? (
+                        <Editor
+                          height="100%"
+                          language={getLanguage(activeFile)}
+                          theme="vs-dark"
+                          value={files[activeFile] || ""}
+                          onChange={(val) => setFiles(f => ({ ...f, [activeFile]: val }))}
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            wordWrap: "on",
+                            padding: { top: 16 },
+                            formatOnPaste: true,
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            smoothScrolling: true,
+                            cursorBlinking: "smooth",
+                            cursorSmoothCaretAnimation: "on"
+                          }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
+                          Select a file to edit
+                        </div>
+                      )}
+                    </div>
+                  </ResizablePanel>
+
+                  <ResizableHandle withHandle className="bg-transparent hover:bg-cyan-500/50 transition-colors w-1" />
+
+                  {/* Live Preview View */}
+                  <ResizablePanel defaultSize={50} className="flex flex-col bg-[#09090b] min-w-[200px]">
+                    <div className="h-10 bg-[#18181b] border-b border-white/5 flex items-center px-4 gap-3 shrink-0">
+                      <Play size={14} className="text-green-400" />
+                      <span className="text-sm font-medium text-slate-300">Live Preview</span>
+                      <div className="flex-1" />
+                      <div className="text-xs text-slate-500 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/5 truncate max-w-[200px]">
+                        localhost:3000
+                      </div>
+                    </div>
+                    <div className="flex-1 p-4 flex items-center justify-center overflow-auto bg-[url('https://transparenttextures.com/patterns/cubes.png')] bg-fixed bg-center">
+                      <div className={`h-full bg-white shadow-2xl overflow-hidden transition-all duration-300 ${viewMode === 'mobile' ? 'w-[375px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[812px]' : viewMode === 'tablet' ? 'w-[768px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[1024px]' : 'w-full rounded-lg'}`}>
+                        <iframe title="live-preview" srcDoc={srcDoc} className="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
+                      </div>
+                    </div>
+                  </ResizablePanel>
+                  
+                </ResizablePanelGroup>
+              </ResizablePanel>
+
+              {/* Bottom Panel */}
+              {isBottomPanelOpen && (
+                <>
+                  <ResizableHandle className="bg-white/5 hover:bg-cyan-500/50 transition-colors h-1" />
+                  <ResizablePanel defaultSize={25} minSize={10} className="bg-[#18181b] flex flex-col border-t border-white/5">
+                    <div className="flex h-9 border-b border-white/5 items-center px-2">
+                      <button onClick={() => setBottomPanelTab('console')} className={`px-3 h-full text-xs font-medium uppercase tracking-wider flex items-center border-b-2 ${bottomPanelTab === 'console' ? 'text-white border-cyan-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                        Console
+                      </button>
+                      <button onClick={() => setBottomPanelTab('terminal')} className={`px-3 h-full text-xs font-medium uppercase tracking-wider flex items-center border-b-2 ${bottomPanelTab === 'terminal' ? 'text-white border-cyan-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                        Terminal
+                      </button>
+                      <div className="flex-1" />
+                      <button onClick={() => setIsBottomPanelOpen(false)} className="text-slate-500 hover:text-white p-1 rounded hover:bg-white/5">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex-1 p-2 font-mono text-xs overflow-y-auto">
+                      {bottomPanelTab === 'console' && (
+                        <div className="flex flex-col gap-1">
+                          {consoleLogs.length === 0 && <div className="text-slate-600 italic">No logs yet...</div>}
+                          {consoleLogs.map((log, i) => (
+                            <div key={i} className={`py-1 px-2 rounded flex gap-3 ${log.type === 'error' ? 'bg-red-500/10 text-red-400' : 'hover:bg-white/5 text-slate-300'}`}>
+                              <span className="text-slate-500 shrink-0">{log.time.toLocaleTimeString([], {hour12:false})}</span>
+                              <span className="whitespace-pre-wrap break-all">{log.msg}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {bottomPanelTab === 'terminal' && (
+                        <div className="text-slate-400 p-2">
+                          <div className="text-green-400 mb-1">$ npm start</div>
+                          <div>Starting development server...</div>
+                          <div className="text-cyan-400 mt-2">Compiled successfully!</div>
+                          <div className="mt-2">You can now view project in the browser.</div>
+                          <div className="mt-2 flex items-center gap-2"><span className="w-2 h-4 bg-slate-400 animate-pulse inline-block" /></div>
+                        </div>
+                      )}
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
+              
+            </ResizablePanelGroup>
+          </ResizablePanel>
+
+        </ResizablePanelGroup>
+      </div>
+
+      {/* Status Bar */}
+      <div className="h-6 bg-[#007acc] text-white flex items-center justify-between px-3 text-[11px] shrink-0 font-medium z-10">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors"><CheckCircle2 size={12} /> Ready</div>
+          <div className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors"><X size={12} className="text-red-300" /> 0 Errors</div>
+          <div className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors text-slate-100">AI Assistant: Active</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">Ln 1, Col 1</div>
+          <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">UTF-8</div>
+          <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">{activeFile ? fileConfigs[activeFile]?.lang : ""}</div>
+          <div className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors" onClick={() => setIsBottomPanelOpen(!isBottomPanelOpen)}>
+            <Terminal size={12} /> Console
           </div>
         </div>
       </div>
