@@ -1,13 +1,19 @@
 import React from "react";
 import { NavLink, Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { CreditCard, Gear, Users, ListChecks, ShieldStar, List } from "@phosphor-icons/react";
+import { CreditCard, Gear, Users, ListChecks, ShieldStar, List, ChartLineUp, Kanban, MagicWand, ChartBar, Heartbeat } from "@phosphor-icons/react";
 
 const ADMIN_NAV = [
+  { to: "/dashboard/admin/analytics", icon: ChartLineUp, label: "Analytics & Revenue", testid: "admin-nav-analytics" },
+  { to: "/dashboard/admin/users", icon: Users, label: "Users", testid: "admin-nav-users" },
+  { to: "/dashboard/admin/projects", icon: Kanban, label: "Projects", testid: "admin-nav-projects" },
+  { to: "/dashboard/admin/generations", icon: MagicWand, label: "Generations", testid: "admin-nav-generations" },
+  { to: "/dashboard/admin/api-usage", icon: ChartBar, label: "API & Providers", testid: "admin-nav-api-usage" },
   { to: "/dashboard/admin/payments", icon: CreditCard, label: "Payments", testid: "admin-nav-payments" },
   { to: "/dashboard/admin/subscriptions", icon: ListChecks, label: "Subscriptions", testid: "admin-nav-subscriptions" },
   { to: "/dashboard/admin/plans", icon: List, label: "Plans", testid: "admin-nav-plans" },
   { to: "/dashboard/admin/settings", icon: Gear, label: "Payment Settings", testid: "admin-nav-settings" },
+  { to: "/dashboard/admin/system", icon: Heartbeat, label: "System Health", testid: "admin-nav-system" },
   { to: "/dashboard/admin/audit", icon: ShieldStar, label: "Audit Log", testid: "admin-nav-audit" },
 ];
 
