@@ -113,7 +113,8 @@ export default function WebsitePage() {
       
       if (!done || !done.files) throw new Error("Edit failed");
       
-      setCurrentProject(p => p ? { ...p, files: done.files } : null);
+      const proj = await api.get(`/website/${id}`);
+      setCurrentProject(proj.data);
       toast.success("Project updated!");
     } catch (err) {
       toast.error(err?.response?.data?.detail || err.message || "AI Edit failed");
