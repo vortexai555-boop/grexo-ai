@@ -846,6 +846,16 @@ async def website_generate(body: WebsiteIn, user=Depends(get_current_user)):
 
 
 async def _run_website_job(job_id: str, user_id: str, description: str, site_type: str, files_data: list):
+    # Load design guidelines if available
+    design_system = ""
+    try:
+        design_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "design_guidelines.json")
+        if os.path.exists(design_path):
+            with open(design_path, "r") as f:
+                design_system = f"\n\n--- DESIGN SYSTEM & PREFERENCES ---\n{f.read()}\n--- END DESIGN SYSTEM ---\n"
+    except Exception:
+        pass
+
     prompt = (
         f"Build a beautiful, modern, fully responsive {site_type} website/application. "
         f"Requirements: {description}. "
@@ -867,7 +877,7 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
                 })
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.")},
+            {"role": "system", "content": SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.") + design_system},
             {"role": "user", "content": user_content_parts}
         ]
         out = await generate_text_free(messages, user_id=user_id)
@@ -1008,13 +1018,24 @@ async def chat_website(site_id: str, body: WebsiteChatIn, user=Depends(get_curre
     }
     await db.website_jobs.insert_one(job.copy())
     await deduct_credits(user["user_id"], 3)
-    asyncio.create_task(_run_website_chat_job(job_id, user["user_id"], site_id, body.prompt, doc.get("files", {})))
+    asyncio.create_task(_run_website_chat_job(job_id, user["user_id"], site_id, body.prompt, doc.get("files", {}), doc.get("chat_history", [])))
     return {"job_id": job_id, "status": "pending"}
 
-async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt: str, current_files: dict):
+async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt: str, current_files: dict, chat_history: list):
     try:
+        # Load design guidelines if available
+        design_system = ""
+        try:
+            design_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "design_guidelines.json")
+            if os.path.exists(design_path):
+                with open(design_path, "r") as f:
+                    design_system = f"\n\n--- DESIGN SYSTEM & PREFERENCES ---\n{f.read()}\n--- END DESIGN SYSTEM ---\n"
+        except Exception:
+            pass
+
         sys_prompt = (
             SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.") + 
+            design_system +
             "\n\nYou will receive the current file structure and code of the project. Modify them based on the user's prompt. "
             "CRITICAL INSTRUCTIONS:\n"
             "1. ONLY RETURN FILES THAT YOU HAVE MODIFIED OR CREATED. Do NOT return files that have not changed.\n"
@@ -1028,6 +1049,14 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         current_code = f"Here are the current files:\n"
         for path, content in current_files.items():
             current_code += f"<file path=\"{path}\">\n{content}\n</file>\n\n"
+            
+        # Add conversational memory context
+        if chat_history:
+            current_code += "--- PREVIOUS CONVERSATION HISTORY ---\n"
+            for msg in chat_history[-10:]: # Keep last 10 messages for context
+                current_code += f"{msg['role'].upper()}: {msg['content']}\n\n"
+            current_code += "--- END HISTORY ---\n\n"
+            
         current_code += f"User Request: {prompt}"
 
         messages = [
@@ -1063,10 +1092,19 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         final_files = current_files.copy()
         for k, v in parsed_files.items():
             final_files[k] = v
+            
+        # Update chat history
+        new_history = chat_history.copy()
+        new_history.append({"role": "user", "content": prompt})
+        
+        # Summarize what the assistant did to save space
+        modified_files_list = list(parsed_files.keys())
+        assistant_summary = f"I updated the following files based on your request: {', '.join(modified_files_list)}"
+        new_history.append({"role": "assistant", "content": assistant_summary})
         
         await db.websites.update_one(
             {"id": site_id, "user_id": user_id},
-            {"$set": {"files": final_files, "updated_at": now_utc().isoformat()}}
+            {"$set": {"files": final_files, "chat_history": new_history, "updated_at": now_utc().isoformat()}}
         )
         await db.website_jobs.update_one(
             {"id": job_id},
