@@ -21,4 +21,4 @@ root.render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
-<script type="module" src="/src/index.jsx"></script>
+
