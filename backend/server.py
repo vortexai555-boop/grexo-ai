@@ -1084,7 +1084,17 @@ async def chat_website(site_id: str, body: WebsiteChatIn, user=Depends(get_curre
 
 async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt: str, current_files: dict):
     try:
-        sys_prompt = SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.") + "\n\nYou will receive the current file structure and code. Modify them based on the user's prompt. You MUST RETURN ALL FILES that you changed or created. Wrap each file inside an XML-like block: <file path=\"relative/path.ext\">...</file>. If a file is not mentioned in your response, it will be kept as-is. Do not write placeholder comments, implement the requested changes fully."
+        sys_prompt = (
+            SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.") + 
+            "\n\nYou will receive the current file structure and code of the project. Modify them based on the user's prompt. "
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. ONLY RETURN FILES THAT YOU HAVE MODIFIED OR CREATED. Do NOT return files that have not changed.\n"
+            "2. If a file is not mentioned in your response, it will be kept exactly as-is.\n"
+            "3. Maintain the existing architecture, styling conventions, and project integrity.\n"
+            "4. If your changes require new dependencies, you MUST also return the updated dependency file (e.g., package.json, requirements.txt, etc.).\n"
+            "5. Wrap each file inside an XML-like block exactly like this: <file path=\"relative/path.ext\">...</file>.\n"
+            "6. Do NOT write placeholder comments; implement the requested changes fully."
+        )
         
         current_code = f"Here are the current files:\n"
         for path, content in current_files.items():
