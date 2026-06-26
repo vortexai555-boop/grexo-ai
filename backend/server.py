@@ -918,9 +918,11 @@ async def website_generate(body: WebsiteIn, user=Depends(get_current_user)):
 
 async def _run_website_job(job_id: str, user_id: str, description: str, site_type: str, files_data: list):
     prompt = (
-        f"Build a beautiful, modern, fully responsive {site_type} website. "
-        f"Requirements: {description}. Use Tailwind via CDN in the HTML. Include responsive layouts. "
-        f"You MUST return the code for 'index.html', 'styles.css', and 'script.js' by wrapping each inside an XML-like block: <file name=\"filename\">...</file>. Do not use JSON."
+        f"Build a beautiful, modern, fully responsive {site_type} website/application. "
+        f"Requirements: {description}. "
+        f"You MUST generate a complete, production-ready full-stack project based on the user's requested technologies (e.g. React, Next.js, Node, Python, Postgres, Firebase, etc.). "
+        f"The project MUST include: Entire folder structure, necessary Components, Pages, Routing, Authentication (if implied), Database connection scripts, API layer, README, Dockerfile, and GitHub Actions workflow if applicable. "
+        f"Return the code for EVERY required file. Wrap each file inside an XML-like block exactly like this: <file path=\"relative/path/to/filename.ext\">...</file>. Do not use JSON. Do not write placeholder comments, implement the actual logic."
     )
     try:
         user_content_parts = [{"type": "text", "text": prompt}]
@@ -936,60 +938,35 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
                 })
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPTS["website"]},
+            {"role": "system", "content": SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.")},
             {"role": "user", "content": user_content_parts}
         ]
         out = await generate_text_free(messages)
         
         import re
         parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+        xml_matches = re.finditer(r'<file\s+path="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
         for m in xml_matches:
-            name = m.group(1).lower()
+            name = m.group(1).strip()
             content = m.group(2).strip()
             if content.startswith("```"):
                 content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            if "html" in name:
-                parsed_files["html"] = content
-            elif "css" in name:
-                parsed_files["css"] = content
-            elif "js" in name or "script" in name:
-                parsed_files["js"] = content
+            parsed_files[name] = content
             
         if not parsed_files:
-            # Fallback to try and extract fenced code blocks if no XML tags found
-            code_blocks = re.finditer(r'```[a-zA-Z]*\s*\n(.*?)```', out, re.DOTALL)
-            blocks = list(code_blocks)
-            if len(blocks) >= 3:
-                parsed_files["html"] = blocks[0].group(1).strip()
-                parsed_files["css"] = blocks[1].group(1).strip()
-                parsed_files["js"] = blocks[2].group(1).strip()
-            elif len(blocks) > 0:
-                html_code = blocks[0].group(1).strip()
-                parsed_files["html"] = html_code
-                
-                # Check for inline styles and scripts
-                import re as regex
-                style_match = regex.search(r'<style>(.*?)</style>', html_code, regex.DOTALL)
-                script_match = regex.search(r'<script>(.*?)</script>', html_code, regex.DOTALL)
-                
-                parsed_files["css"] = style_match.group(1).strip() if style_match else "* { margin: 0; padding: 0; box-sizing: border-box; }"
-                parsed_files["js"] = script_match.group(1).strip() if script_match else "console.log('App loaded.');"
-                
-                if style_match or script_match:
-                     # Clean the html if it had embedded script/style to avoid duplicate rendering issues
-                     cleaned = regex.sub(r'<style>.*?</style>', '', html_code, flags=regex.DOTALL)
-                     cleaned = regex.sub(r'<script>.*?</script>', '', cleaned, flags=regex.DOTALL)
-                     parsed_files["html"] = cleaned
-                
+            # Fallback to try and extract <file name="..."> just in case
+            xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+            for m in xml_matches:
+                name = m.group(1).strip()
+                content = m.group(2).strip()
+                if content.startswith("```"):
+                    content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
+                parsed_files[name] = content
+
         if not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
-        files = {
-            "html": parsed_files.get("html", "<h1>Generation Error</h1>"),
-            "css": parsed_files.get("css", "body { background: white; color: black; }"),
-            "js": parsed_files.get("js", "console.log('App loaded.');")
-        }
+        files = parsed_files
         
         site_id = new_id("site")
         name = description[:30] + ("..." if len(description) > 30 else "")
@@ -1107,12 +1084,11 @@ async def chat_website(site_id: str, body: WebsiteChatIn, user=Depends(get_curre
 
 async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt: str, current_files: dict):
     try:
-        sys_prompt = SYSTEM_PROMPTS["website"] + "\n\nYou will receive the current files. Modify them based on the user's prompt. YOU MUST RETURN ALL THREE FILES completely, even if only one changed. Return ONLY XML blocks."
+        sys_prompt = SYSTEM_PROMPTS.get("website", "You are an expert AI software engineer.") + "\n\nYou will receive the current file structure and code. Modify them based on the user's prompt. You MUST RETURN ALL FILES that you changed or created. Wrap each file inside an XML-like block: <file path=\"relative/path.ext\">...</file>. If a file is not mentioned in your response, it will be kept as-is. Do not write placeholder comments, implement the requested changes fully."
         
-        current_code = f"Here is the current code:\n"
-        current_code += f"index.html:\n```html\n{current_files.get('html', '')}\n```\n\n"
-        current_code += f"styles.css:\n```css\n{current_files.get('css', '')}\n```\n\n"
-        current_code += f"script.js:\n```javascript\n{current_files.get('js', '')}\n```\n\n"
+        current_code = f"Here are the current files:\n"
+        for path, content in current_files.items():
+            current_code += f"<file path=\"{path}\">\n{content}\n</file>\n\n"
         current_code += f"User Request: {prompt}"
 
         messages = [
@@ -1124,47 +1100,30 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         
         import re
         parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+        xml_matches = re.finditer(r'<file\s+path="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
         for m in xml_matches:
-            name = m.group(1).lower()
+            name = m.group(1).strip()
             content = m.group(2).strip()
             if content.startswith("```"):
                 content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            if "html" in name:
-                parsed_files["html"] = content
-            elif "css" in name:
-                parsed_files["css"] = content
-            elif "js" in name or "script" in name:
-                parsed_files["js"] = content
-                
+            parsed_files[name] = content
+
         if not parsed_files:
-            code_blocks = re.finditer(r'```[a-zA-Z]*\s*\n(.*?)```', out, re.DOTALL)
-            blocks = list(code_blocks)
-            if len(blocks) >= 3:
-                parsed_files["html"] = blocks[0].group(1).strip()
-                parsed_files["css"] = blocks[1].group(1).strip()
-                parsed_files["js"] = blocks[2].group(1).strip()
-            elif len(blocks) > 0:
-                html_code = blocks[0].group(1).strip()
-                parsed_files["html"] = html_code
-                import re as regex
-                style_match = regex.search(r'<style>(.*?)</style>', html_code, regex.DOTALL)
-                script_match = regex.search(r'<script>(.*?)</script>', html_code, regex.DOTALL)
-                parsed_files["css"] = style_match.group(1).strip() if style_match else current_files.get('css', '')
-                parsed_files["js"] = script_match.group(1).strip() if script_match else current_files.get('js', '')
-                if style_match or script_match:
-                     cleaned = regex.sub(r'<style>.*?</style>', '', html_code, flags=regex.DOTALL)
-                     cleaned = regex.sub(r'<script>.*?</script>', '', cleaned, flags=regex.DOTALL)
-                     parsed_files["html"] = cleaned
+            # Fallback to name=""" 
+            xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+            for m in xml_matches:
+                name = m.group(1).strip()
+                content = m.group(2).strip()
+                if content.startswith("```"):
+                    content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
+                parsed_files[name] = content
 
         if not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
-        final_files = {
-            "html": parsed_files.get("html", current_files.get("html", "")),
-            "css": parsed_files.get("css", current_files.get("css", "")),
-            "js": parsed_files.get("js", current_files.get("js", ""))
-        }
+        final_files = current_files.copy()
+        for k, v in parsed_files.items():
+            final_files[k] = v
         
         await db.websites.update_one(
             {"id": site_id, "user_id": user_id},
