@@ -17,6 +17,7 @@ import Editor from "@monaco-editor/react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import api from "@/lib/api";
+import { SandpackProvider, SandpackPreview, SandpackConsole } from "@codesandbox/sandpack-react";
 
 const getFileInfo = (path) => {
   if (!path) return { icon: File, name: "", lang: "plaintext", color: "text-slate-400" };
@@ -120,7 +121,6 @@ export default function WebsiteEditor({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(true);
   const [bottomPanelTab, setBottomPanelTab] = useState("console");
-  const [consoleLogs, setConsoleLogs] = useState([]);
   
   const [folderOpen, setFolderOpen] = useState(true);
 
@@ -155,7 +155,6 @@ export default function WebsiteEditor({
     return () => clearTimeout(timer);
   }, [files, project?.id, project?.files, onUpdateFiles]);
 
-  // Console message handler from iframe
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data && event.data.type === 'THUMBNAIL' && event.data.data) {
@@ -163,9 +162,6 @@ export default function WebsiteEditor({
           api.put(`/website/${project.id}`, { thumbnail_url: event.data.data }).catch(console.error);
           project.thumbnail_url = event.data.data;
         }
-      }
-      if (event.data && event.data.type === 'CONSOLE') {
-        setConsoleLogs(prev => [...prev, { type: event.data.logType, msg: event.data.msg, time: new Date() }]);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -234,17 +230,6 @@ export default function WebsiteEditor({
     const css = files["styles.css"] || files["css"] || "";
     const js = files["script.js"] || files["js"] || "";
     return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${css}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${html}\n<script>${js}</script>\n</body>\n</html>`;
-  };
-
-  const safeJs = () => {
-    const js = files["script.js"] || files["js"] || "";
-    return js.replace(/<\/script>/gi, '<\\/script>');
-  };
-  
-  const getSrcDoc = () => {
-    const html = files["index.html"] || files["html"] || "<h1>No index.html found. Preview is limited for full frameworks.</h1>";
-    const css = files["styles.css"] || files["css"] || "";
-    return files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>\n  window.onerror = function(msg) { window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg }, '*'); return true; };\n  const originalConsoleLog = console.log;\n  console.log = function(...args) { originalConsoleLog(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'log', msg: args.join(' ') }, '*'); };\n  const originalConsoleError = console.error;\n  console.error = function(...args) { originalConsoleError(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg: args.join(' ') }, '*'); };\n</script>\n<style>${css}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>\n<script>\n  setTimeout(() => {\n    if (window.html2canvas) {\n      window.html2canvas(document.body, { scale: 0.5, useCORS: true }).then(canvas => {\n        window.parent.postMessage({ type: 'THUMBNAIL', data: canvas.toDataURL('image/jpeg', 0.5) }, '*');\n      }).catch(e => console.error(e));\n    }\n  }, 2000);\n</script>\n</head>\n<body>\n${html}\n<script>try { ${safeJs()} } catch(e) { console.error(e); }</script>\n</body>\n</html>` : "";
   };
 
   const getLanguage = (id) => getFileInfo(id).lang;
@@ -345,7 +330,45 @@ export default function WebsiteEditor({
 
       {/* Main IDE Body */}
       <div className="flex-1 flex min-h-0 bg-[#1e1e1e]">
-        <ResizablePanelGroup direction="horizontal">
+        <SandpackProvider 
+          template={(() => {
+            if (files["package.json"]) {
+              try {
+                const pkg = JSON.parse(files["package.json"]);
+                if (pkg.dependencies?.next) return "nextjs";
+                if (pkg.dependencies?.react) return "vite-react";
+                if (pkg.dependencies?.vue) return "vite-vue";
+                if (pkg.dependencies?.svelte) return "svelte";
+              } catch (e) {}
+            }
+            if (files["next.config.js"]) return "nextjs";
+            if (files["vite.config.js"] || files["vite.config.ts"]) return "vite-react";
+            if (files["src/App.jsx"] || files["src/App.tsx"] || files["App.jsx"]) return "vite-react";
+            if (files["src/App.vue"]) return "vite-vue";
+            return "vanilla";
+          })()}
+          files={Object.entries(files).reduce((acc, [path, content]) => {
+            let finalContent = content;
+            const isVanilla = !files["package.json"] && !files["next.config.js"] && !files["vite.config.js"];
+            if (isVanilla && (path === "index.html" || path === "/index.html") && !content.includes("tailwindcss")) {
+                if (finalContent.includes("</head>")) {
+                    finalContent = finalContent.replace("</head>", '<script src="https://cdn.tailwindcss.com"></script>\n</head>');
+                } else {
+                    finalContent = `<script src="https://cdn.tailwindcss.com"></script>\n${finalContent}`;
+                }
+            }
+            acc[path.startsWith('/') ? path : `/${path}`] = finalContent;
+            return acc;
+          }, {})}
+          options={{
+            autoReload: true,
+            initMode: "immediate",
+            recompileMode: "delayed",
+            recompileDelay: 500,
+          }}
+          className="flex-1 flex flex-col h-full w-full"
+        >
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
           
           {/* Sidebar */}
           {isSidebarOpen && (
@@ -496,17 +519,23 @@ export default function WebsiteEditor({
 
                   {/* Live Preview View */}
                   <ResizablePanel defaultSize={50} className="flex flex-col bg-[#09090b] min-w-[200px]">
-                    <div className="h-10 bg-[#18181b] border-b border-white/5 flex items-center px-4 gap-3 shrink-0">
-                      <Play size={14} className="text-green-400" />
-                      <span className="text-sm font-medium text-slate-300">Live Preview</span>
-                      <div className="flex-1" />
-                      <div className="text-xs text-slate-500 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/5 truncate max-w-[200px]">
-                        localhost:3000
+                    <div className="flex-1 flex flex-col h-full">
+                      <div className="h-10 bg-[#18181b] border-b border-white/5 flex items-center px-4 gap-3 shrink-0">
+                        <Play size={14} className="text-green-400" />
+                        <span className="text-sm font-medium text-slate-300">Live Preview</span>
+                        <div className="flex-1" />
+                        <div className="text-xs text-slate-500 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/5 truncate max-w-[200px]">
+                          localhost:3000
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 p-4 flex items-center justify-center overflow-auto bg-[url('https://transparenttextures.com/patterns/cubes.png')] bg-fixed bg-center">
-                      <div className={`h-full bg-white shadow-2xl overflow-hidden transition-all duration-300 ${viewMode === 'mobile' ? 'w-[375px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[812px]' : viewMode === 'tablet' ? 'w-[768px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[1024px]' : 'w-full rounded-lg'}`}>
-                        <iframe title="live-preview" srcDoc={getSrcDoc()} className="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
+                      <div className="flex-1 p-4 flex items-center justify-center overflow-auto bg-[url('https://transparenttextures.com/patterns/cubes.png')] bg-fixed bg-center">
+                        <div className={`h-full bg-white shadow-2xl overflow-hidden transition-all duration-300 ${viewMode === 'mobile' ? 'w-[375px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[812px]' : viewMode === 'tablet' ? 'w-[768px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[1024px]' : 'w-full rounded-lg'}`}>
+                          <SandpackPreview 
+                            showOpenInCodeSandbox={false}
+                            showRefreshButton={true}
+                            style={{ height: '100%', minHeight: '100%' }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </ResizablePanel>
@@ -533,14 +562,8 @@ export default function WebsiteEditor({
                     </div>
                     <div className="flex-1 p-2 font-mono text-xs overflow-y-auto">
                       {bottomPanelTab === 'console' && (
-                        <div className="flex flex-col gap-1">
-                          {consoleLogs.length === 0 && <div className="text-slate-600 italic">No logs yet...</div>}
-                          {consoleLogs.map((log, i) => (
-                            <div key={i} className={`py-1 px-2 rounded flex gap-3 ${log.type === 'error' ? 'bg-red-500/10 text-red-400' : 'hover:bg-white/5 text-slate-300'}`}>
-                              <span className="text-slate-500 shrink-0">{log.time.toLocaleTimeString([], {hour12:false})}</span>
-                              <span className="whitespace-pre-wrap break-all">{log.msg}</span>
-                            </div>
-                          ))}
+                        <div className="flex flex-col gap-1 h-full overflow-hidden">
+                          <SandpackConsole style={{ height: '100%', width: '100%', minHeight: '100%' }} />
                         </div>
                       )}
                       {bottomPanelTab === 'terminal' && (
@@ -561,6 +584,7 @@ export default function WebsiteEditor({
           </ResizablePanel>
 
         </ResizablePanelGroup>
+        </SandpackProvider>
       </div>
 
       {/* Status Bar */}
