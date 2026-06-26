@@ -32,16 +32,16 @@ export default function WebsiteDashboard({
     <div className="flex flex-col h-full bg-[#07080A] text-gray-200 p-6 lg:p-10 overflow-y-auto">
       <div className="flex flex-col gap-2 mb-8">
         <h1 className="text-4xl font-light tracking-tighter">
-          Website <span className="text-gradient-cyan font-medium">Projects</span>
+          AI <span className="text-gradient-cyan font-medium">Projects</span>
         </h1>
-        <p className="text-slate-400">Manage your generated websites and continue editing them.</p>
+        <p className="text-slate-400">Manage your generated projects and continue editing them in the IDE.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
         <div className="lg:col-span-2 flex flex-col p-6 rounded-2xl bg-[#0d0e12] border border-white/5 shadow-xl">
-          <h2 className="text-lg font-medium mb-4 text-white">Generate New Website</h2>
+          <h2 className="text-lg font-medium mb-4 text-white">Generate New Project</h2>
           <Textarea 
-            placeholder="Describe the website you want to build (e.g. A modern BMW luxury website)..." 
+            placeholder="Describe the app you want to build (e.g. A full-stack Next.js + Supabase task manager with auth)..." 
             className="w-full h-32 bg-[#07080A] text-gray-200 border-white/10 focus-visible:ring-cyan-500 resize-none rounded-xl mb-4"
             value={description}
             onChange={e => setDescription(e.target.value)}
@@ -71,7 +71,7 @@ export default function WebsiteDashboard({
       </div>
 
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-medium text-white">Recent Websites</h2>
+        <h2 className="text-xl font-medium text-white">Recent Projects</h2>
         <div className="relative w-64">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <Input 
