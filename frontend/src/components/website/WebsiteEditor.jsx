@@ -6,7 +6,7 @@ import {
   Download, Copy, Maximize2, Minimize2, ArrowLeft, Edit2, 
   Check, LayoutPanelLeft, Play, Square, Terminal, X,
   FolderOpen, ChevronRight, ChevronDown, Wand2, Search,
-  Settings, CheckCircle2, CircleDashed, FileJson
+  Settings, CheckCircle2, CircleDashed, FileJson, File, Database, Image
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,20 +18,102 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import api from "@/lib/api";
 
+const getFileInfo = (path) => {
+  if (!path) return { icon: File, name: "", lang: "plaintext", color: "text-slate-400" };
+  const name = path.split("/").pop() || path;
+  const ext = name.split(".").pop()?.toLowerCase();
+  
+  if (name === "package.json" || ext === "json") return { icon: FileJson, name, lang: "json", color: "text-green-400" };
+  if (["html", "htm"].includes(ext)) return { icon: FileCode2, name, lang: "html", color: "text-orange-400" };
+  if (["css", "scss", "sass"].includes(ext)) return { icon: Globe, name, lang: "css", color: "text-blue-400" };
+  if (["js", "jsx"].includes(ext)) return { icon: FileText, name, lang: "javascript", color: "text-yellow-400" };
+  if (["ts", "tsx"].includes(ext)) return { icon: FileText, name, lang: "typescript", color: "text-blue-500" };
+  if (["py"].includes(ext)) return { icon: FileCode2, name, lang: "python", color: "text-blue-300" };
+  if (["md"].includes(ext)) return { icon: FileText, name, lang: "markdown", color: "text-slate-300" };
+  if (["sql", "db"].includes(ext)) return { icon: Database, name, lang: "sql", color: "text-purple-400" };
+  return { icon: File, name, lang: "plaintext", color: "text-slate-400" };
+};
+
+const FileTree = ({ items, currentPath, openFile, activeFile, depth = 0 }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  
+  if (items.type === "file") {
+    const info = getFileInfo(currentPath);
+    const Icon = info.icon;
+    return (
+      <div 
+        onClick={() => openFile(currentPath)}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        className={`flex items-center gap-2 py-1 pr-2 rounded-sm text-sm cursor-pointer transition-colors ${activeFile === currentPath ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+      >
+        <Icon size={14} className={info.color} />
+        <span className="truncate">{info.name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        className="flex items-center gap-1 py-1 pr-2 rounded-sm text-sm font-medium text-slate-300 hover:text-white cursor-pointer hover:bg-white/5 transition-colors"
+      >
+        {isOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+        <FolderOpen size={14} className="text-yellow-500/80" />
+        <span className="truncate">{currentPath.split("/").pop() || currentPath}</span>
+      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }} 
+            animate={{ height: "auto", opacity: 1 }} 
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden flex flex-col"
+          >
+            {Object.keys(items.children).sort((a,b) => {
+               // Sort folders first
+               const aIsFolder = items.children[a].type === "folder";
+               const bIsFolder = items.children[b].type === "folder";
+               if (aIsFolder && !bIsFolder) return -1;
+               if (!aIsFolder && bIsFolder) return 1;
+               return a.localeCompare(b);
+            }).map(key => (
+              <FileTree 
+                key={key} 
+                items={items.children[key]} 
+                currentPath={currentPath ? `${currentPath}/${key}` : key}
+                openFile={openFile} 
+                activeFile={activeFile} 
+                depth={depth + 1} 
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default function WebsiteEditor({ 
   project, 
   onBack, 
   onUpdateFiles, 
   onChat 
 }) {
-  const [activeFile, setActiveFile] = useState("html");
-  const [openFiles, setOpenFiles] = useState(["html", "css", "js"]);
+  const [activeFile, setActiveFile] = useState(null);
+  const [openFiles, setOpenFiles] = useState([]);
   const [viewMode, setViewMode] = useState("desktop");
   const [isFullScreen, setIsFullScreen] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
-  const [files, setFiles] = useState(project?.files || { html: "", css: "", js: "" });
-  const [sidebarTab, setSidebarTab] = useState("explorer"); // explorer, ai, search
+  
+  // Default to a simple structure if none exists
+  const defaultFiles = { "index.html": "<h1>Hello World</h1>", "styles.css": "", "script.js": "console.log('loaded');" };
+  const initialFiles = (project?.files && Object.keys(project.files).length > 0) ? project.files : defaultFiles;
+  
+  const [files, setFiles] = useState(initialFiles);
+  const [sidebarTab, setSidebarTab] = useState("explorer"); 
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(project?.name || "");
@@ -42,8 +124,24 @@ export default function WebsiteEditor({
   
   const [folderOpen, setFolderOpen] = useState(true);
 
+  // Initialize active file safely
   useEffect(() => {
-    if (project?.files) setFiles(project.files);
+    if (Object.keys(files).length > 0 && !activeFile) {
+      const firstHtml = Object.keys(files).find(f => f.endsWith(".html")) || Object.keys(files)[0];
+      setOpenFiles([firstHtml]);
+      setActiveFile(firstHtml);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (project?.files && Object.keys(project.files).length > 0) {
+      setFiles(project.files);
+      const firstHtml = Object.keys(project.files).find(f => f.endsWith(".html")) || Object.keys(project.files)[0];
+      if (firstHtml && !activeFile) {
+        setOpenFiles([firstHtml]);
+        setActiveFile(firstHtml);
+      }
+    }
     if (project?.name) setEditName(project.name);
   }, [project]);
 
@@ -97,11 +195,11 @@ export default function WebsiteEditor({
   const downloadZip = async () => {
     if (!files) return;
     const zip = new JSZip();
-    zip.file("index.html", files["html"] || "");
-    zip.file("styles.css", files["css"] || "");
-    zip.file("script.js", files["js"] || "");
+    for (const [path, content] of Object.entries(files)) {
+      zip.file(path, content);
+    }
     const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, `${project?.name || 'website'}.zip`);
+    saveAs(blob, `${project?.name || 'project'}.zip`);
   };
 
   const handleChat = async () => {
@@ -132,20 +230,47 @@ export default function WebsiteEditor({
   };
 
   const getFullHtml = () => {
-    return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${files["css"]}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${files["html"]}\n<script>${files["js"]}</script>\n</body>\n</html>`;
+    const html = files["index.html"] || files["html"] || "<h1>No HTML file</h1>";
+    const css = files["styles.css"] || files["css"] || "";
+    const js = files["script.js"] || files["js"] || "";
+    return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n<style>${css}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n</head>\n<body>\n${html}\n<script>${js}</script>\n</body>\n</html>`;
   };
 
-  const safeJs = (files && files["js"]) ? files["js"].replace(/<\/script>/gi, '<\\/script>') : "";
-  const srcDoc = files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>\n  window.onerror = function(msg) { window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg }, '*'); return true; };\n  const originalConsoleLog = console.log;\n  console.log = function(...args) { originalConsoleLog(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'log', msg: args.join(' ') }, '*'); };\n  const originalConsoleError = console.error;\n  console.error = function(...args) { originalConsoleError(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg: args.join(' ') }, '*'); };\n</script>\n<style>${files["css"] || ""}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>\n<script>\n  setTimeout(() => {\n    if (window.html2canvas) {\n      window.html2canvas(document.body, { scale: 0.5, useCORS: true }).then(canvas => {\n        window.parent.postMessage({ type: 'THUMBNAIL', data: canvas.toDataURL('image/jpeg', 0.5) }, '*');\n      }).catch(e => console.error(e));\n    }\n  }, 2000);\n</script>\n</head>\n<body>\n${files["html"] || ""}\n<script>try { ${safeJs} } catch(e) { console.error(e); }</script>\n</body>\n</html>` : "";
-
-  const fileConfigs = {
-    "html": { icon: FileCode2, name: "index.html", lang: "html", color: "text-orange-400" },
-    "css": { icon: Globe, name: "styles.css", lang: "css", color: "text-blue-400" },
-    "js": { icon: FileText, name: "script.js", lang: "javascript", color: "text-yellow-400" },
-    "json": { icon: FileJson, name: "package.json", lang: "json", color: "text-green-400" }
+  const safeJs = () => {
+    const js = files["script.js"] || files["js"] || "";
+    return js.replace(/<\/script>/gi, '<\\/script>');
+  };
+  
+  const getSrcDoc = () => {
+    const html = files["index.html"] || files["html"] || "<h1>No index.html found. Preview is limited for full frameworks.</h1>";
+    const css = files["styles.css"] || files["css"] || "";
+    return files ? `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8" />\n<script>\n  window.onerror = function(msg) { window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg }, '*'); return true; };\n  const originalConsoleLog = console.log;\n  console.log = function(...args) { originalConsoleLog(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'log', msg: args.join(' ') }, '*'); };\n  const originalConsoleError = console.error;\n  console.error = function(...args) { originalConsoleError(...args); window.parent.postMessage({ type: 'CONSOLE', logType: 'error', msg: args.join(' ') }, '*'); };\n</script>\n<style>${css}</style>\n<script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>\n<script>\n  setTimeout(() => {\n    if (window.html2canvas) {\n      window.html2canvas(document.body, { scale: 0.5, useCORS: true }).then(canvas => {\n        window.parent.postMessage({ type: 'THUMBNAIL', data: canvas.toDataURL('image/jpeg', 0.5) }, '*');\n      }).catch(e => console.error(e));\n    }\n  }, 2000);\n</script>\n</head>\n<body>\n${html}\n<script>try { ${safeJs()} } catch(e) { console.error(e); }</script>\n</body>\n</html>` : "";
   };
 
-  const getLanguage = (id) => fileConfigs[id]?.lang || "plaintext";
+  const getLanguage = (id) => getFileInfo(id).lang;
+  
+  // Build a tree from flat paths
+  const buildTree = (fileMap) => {
+    const root = { type: "folder", children: {} };
+    for (const path of Object.keys(fileMap)) {
+      const parts = path.split("/");
+      let current = root;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (i === parts.length - 1) {
+          current.children[part] = { type: "file" };
+        } else {
+          if (!current.children[part]) {
+            current.children[part] = { type: "folder", children: {} };
+          }
+          current = current.children[part];
+        }
+      }
+    }
+    return root;
+  };
+  
+  const fileTree = buildTree(files);
 
   return (
     <div className={`flex flex-col text-gray-200 overflow-hidden font-sans ${isFullScreen ? 'fixed inset-0 z-[100] bg-[#111111]' : 'h-full bg-transparent'}`}>
@@ -253,21 +378,23 @@ export default function WebsiteEditor({
                             initial={{ height: 0, opacity: 0 }} 
                             animate={{ height: "auto", opacity: 1 }} 
                             exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden pl-4 mt-1 flex flex-col gap-0.5"
+                            className="overflow-hidden flex flex-col pt-1"
                           >
-                            {["html", "css", "js"].map(f => {
-                              const conf = fileConfigs[f];
-                              return (
-                                <div 
-                                  key={f}
-                                  onClick={() => openFile(f)}
-                                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors ${activeFile === f ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
-                                >
-                                  <conf.icon size={14} className={conf.color} />
-                                  <span>{conf.name}</span>
-                                </div>
-                              )
-                            })}
+                            {Object.keys(fileTree.children).sort((a,b) => {
+                               const aIsFolder = fileTree.children[a].type === "folder";
+                               const bIsFolder = fileTree.children[b].type === "folder";
+                               if (aIsFolder && !bIsFolder) return -1;
+                               if (!aIsFolder && bIsFolder) return 1;
+                               return a.localeCompare(b);
+                            }).map(key => (
+                              <FileTree 
+                                key={key} 
+                                items={fileTree.children[key]} 
+                                currentPath={key} 
+                                openFile={openFile} 
+                                activeFile={activeFile} 
+                              />
+                            ))}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -314,15 +441,16 @@ export default function WebsiteEditor({
                   <ResizablePanel defaultSize={50} className="flex flex-col bg-[#1e1e1e] border-r border-white/5 min-w-[200px]">
                     <div className="flex h-10 bg-[#18181b] border-b border-white/5 items-center overflow-x-auto hide-scrollbar">
                       {openFiles.map(f => {
-                        const conf = fileConfigs[f];
+                        const info = getFileInfo(f);
+                        const Icon = info.icon;
                         return (
                           <div 
                             key={f} 
                             onClick={() => setActiveFile(f)}
                             className={`flex items-center gap-2 h-full px-4 text-sm border-r border-white/5 cursor-pointer min-w-[120px] max-w-[200px] group transition-colors ${activeFile === f ? 'bg-[#1e1e1e] text-white border-t-2 border-t-cyan-500' : 'bg-[#18181b] text-slate-400 hover:bg-[#27272a]'}`}
                           >
-                            <conf.icon size={14} className={conf.color} />
-                            <span className="truncate flex-1">{conf.name}</span>
+                            <Icon size={14} className={info.color} />
+                            <span className="truncate flex-1" title={f}>{info.name}</span>
                             <div 
                               onClick={(e) => closeFile(e, f)}
                               className={`p-0.5 rounded-md hover:bg-white/10 ${activeFile === f ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -334,7 +462,7 @@ export default function WebsiteEditor({
                       })}
                     </div>
                     <div className="h-6 bg-[#1e1e1e] flex items-center px-4 text-xs text-slate-500 gap-2 border-b border-white/5 shrink-0">
-                      <span>{project?.name || "project"}</span> <ChevronRight size={10} /> <span>{fileConfigs[activeFile]?.name || ""}</span>
+                      <span>{project?.name || "project"}</span> <ChevronRight size={10} /> <span>{activeFile || ""}</span>
                     </div>
                     <div className="flex-1 relative">
                       {activeFile ? (
@@ -378,7 +506,7 @@ export default function WebsiteEditor({
                     </div>
                     <div className="flex-1 p-4 flex items-center justify-center overflow-auto bg-[url('https://transparenttextures.com/patterns/cubes.png')] bg-fixed bg-center">
                       <div className={`h-full bg-white shadow-2xl overflow-hidden transition-all duration-300 ${viewMode === 'mobile' ? 'w-[375px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[812px]' : viewMode === 'tablet' ? 'w-[768px] rounded-[2rem] border-[12px] border-[#1f2334] max-h-[1024px]' : 'w-full rounded-lg'}`}>
-                        <iframe title="live-preview" srcDoc={srcDoc} className="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
+                        <iframe title="live-preview" srcDoc={getSrcDoc()} className="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
                       </div>
                     </div>
                   </ResizablePanel>
@@ -445,7 +573,7 @@ export default function WebsiteEditor({
         <div className="flex items-center gap-3">
           <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">Ln 1, Col 1</div>
           <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">UTF-8</div>
-          <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">{activeFile ? fileConfigs[activeFile]?.lang : ""}</div>
+          <div className="cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors">{activeFile ? getFileInfo(activeFile).lang : ""}</div>
           <div className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1.5 py-0.5 rounded transition-colors" onClick={() => setIsBottomPanelOpen(!isBottomPanelOpen)}>
             <Terminal size={12} /> Console
           </div>
