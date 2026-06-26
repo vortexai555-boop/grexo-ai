@@ -370,6 +370,9 @@ export default function WebsiteEditor({
                   <button onClick={() => setSidebarTab('ai')} className={`flex-1 flex justify-center items-center ${sidebarTab === 'ai' ? 'text-white border-b-2 border-cyan-500 bg-white/5' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}>
                     <Wand2 size={16} />
                   </button>
+                  <button onClick={() => setSidebarTab('tools')} className={`flex-1 flex justify-center items-center ${sidebarTab === 'tools' ? 'text-white border-b-2 border-cyan-500 bg-white/5' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <Settings size={16} />
+                  </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -437,6 +440,44 @@ export default function WebsiteEditor({
                             {isChatting ? "Generating Edit..." : "Generate Code"}
                           </Button>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {sidebarTab === 'tools' && (
+                    <div className="p-4 flex flex-col h-full gap-4">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Advanced AI Tools</div>
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin">
+                        {[
+                          { name: "AI Debugger", icon: Search, instruction: "Debug the current code. Find any runtime or syntax errors and fix them." },
+                          { name: "AI Refactoring", icon: Edit2, instruction: "Refactor the codebase for better structure, modern syntax, and clean code principles." },
+                          { name: "AI Code Review", icon: CheckCircle2, instruction: "Review the code. Identify anti-patterns and fix them." },
+                          { name: "AI Security Scanner", icon: Database, instruction: "Scan the code for security vulnerabilities (e.g. injection, xss) and patch them." },
+                          { name: "AI Performance Optimizer", icon: Play, instruction: "Optimize the code for performance (e.g. caching, lazy loading, reducing renders)." },
+                          { name: "AI SEO Optimizer", icon: Globe, instruction: "Optimize the application for SEO (meta tags, semantic HTML, structured data)." },
+                          { name: "AI Accessibility Checker", icon: LayoutPanelLeft, instruction: "Fix accessibility issues (aria attributes, color contrast, keyboard navigation)." },
+                          { name: "AI Database Designer", icon: Database, instruction: "Design or optimize the database schema/structure for the application." },
+                          { name: "AI API Generator", icon: Terminal, instruction: "Generate necessary API routes or mock endpoints for the application." },
+                          { name: "AI Unit Test Generator", icon: Check, instruction: "Write or generate unit tests for the core logic components." },
+                          { name: "AI Documentation", icon: FileText, instruction: "Generate comprehensive documentation (README, code comments) for the project." },
+                        ].map(tool => (
+                          <button
+                            key={tool.name}
+                            onClick={() => {
+                              if (!isChatting) {
+                                setIsChatting(true);
+                                onChat(project.id, tool.instruction).finally(() => setIsChatting(false));
+                              }
+                            }}
+                            disabled={isChatting}
+                            className="w-full text-left p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors flex items-center gap-3 disabled:opacity-50"
+                          >
+                            <tool.icon size={16} className="text-cyan-400 shrink-0" />
+                            <div>
+                              <div className="text-sm font-medium text-slate-200">{tool.name}</div>
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
