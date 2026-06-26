@@ -84,8 +84,13 @@
       "last 1 safari version"
     ]
   },
-  "devDependencies": {
+    "devDependencies": {
     "vite": "^6.2.3",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+    "@craco/craco": "7.1.0",
+    // ... rest of the dependencies
+  }
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
     "@craco/craco": "7.1.0",
     "@emergentbase/visual-edits": "https://assets.emergent.sh/npm/emergentbase-visual-edits-1.0.8.tgz",
