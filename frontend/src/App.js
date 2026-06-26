@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Landing = React.lazy(() => import("@/pages/Landing"));
 const Login = React.lazy(() => import("@/pages/Login"));
@@ -36,7 +37,7 @@ const AdminApiUsage = React.lazy(() => import("@/pages/admin/AdminApiUsage"));
 const AdminAnalytics = React.lazy(() => import("@/pages/admin/AdminAnalytics"));
 const AdminSystem = React.lazy(() => import("@/pages/admin/AdminSystem"));
 
-// Loading Fallback
+// Admin pages
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-[#030305]">
     <div className="flex flex-col items-center gap-4">
@@ -57,7 +58,8 @@ function AppRouter() {
     );
   }
   return (
-    <Suspense fallback={<PageLoader />}>
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
@@ -97,7 +99,8 @@ function AppRouter() {
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
