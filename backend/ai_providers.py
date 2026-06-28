@@ -76,7 +76,7 @@ class GeminiProvider(AIProvider):
             config=types.GenerateImagesConfig(
                 number_of_images=1,
                 output_mime_type="image/jpeg",
-                aspect_ratio=aspect_ratio.replace(":", "")
+                aspect_ratio=aspect_ratio
             )
         )
         if result.generated_images:
@@ -288,8 +288,12 @@ class ProviderManager:
                  provider = ProviderFactory.get_provider(provider_name)
                  res = await provider.generate_image(prompt, api_key, aspect_ratio)
                  if res: return res
+             except NotImplementedError:
+                 logger.error(f"Image Provider {provider_name} does not support image generation.")
+                 # Continue to fallback
              except Exception as e:
                  logger.error(f"Image Provider {provider_name} failed: {e}")
+                 raise Exception(f"{provider_name} image generation failed: {e}")
                  
         # Fallback personal keys that support imaging
         for p_name in ["openai", "google", "replicate"]:
