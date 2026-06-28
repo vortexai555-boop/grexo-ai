@@ -409,7 +409,7 @@ async def generate_text_free(messages: list, user_id: Optional[str] = None) -> s
             
     try:
         return await ProviderManager.execute_text(
-            messages, user_keys, default_provider=default_provider, system_fallback=False
+            messages, user_keys, default_provider=default_provider, system_fallback=True
         )
     except Exception as e:
         logger.error(f"Text generation failed: {e}")
