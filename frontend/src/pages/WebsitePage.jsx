@@ -3,12 +3,14 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import WebsiteDashboard from "../components/website/WebsiteDashboard";
 import WebsiteEditor from "../components/website/WebsiteEditor";
+import { useBYOK } from "@/hooks/useBYOK";
 
 export default function WebsitePage() {
   const [viewState, setViewState] = useState("dashboard"); // 'dashboard' or 'editor'
   const [projects, setProjects] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { requireKey } = useBYOK();
 
   useEffect(() => {
     fetchProjects();
@@ -23,35 +25,37 @@ export default function WebsitePage() {
     }
   };
 
-  const generate = async (description) => {
-    setIsGenerating(true);
-    try {
-      const start = await api.post("/website/generate", { description, site_type: "landing", files: [] });
-      const jobId = start.data.job_id;
-      
-      const deadline = Date.now() + 5 * 60 * 1000;
-      let done = null;
-      while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const j = await api.get(`/website/jobs/${jobId}`);
-        if (j.data.status === "done") { done = j.data; break; }
-        if (j.data.status === "error") {
-          throw new Error(j.data.error || "Generation failed");
+  const generate = (description) => {
+    requireKey(async () => {
+      setIsGenerating(true);
+      try {
+        const start = await api.post("/website/generate", { description, site_type: "landing", files: [] });
+        const jobId = start.data.job_id;
+        
+        const deadline = Date.now() + 5 * 60 * 1000;
+        let done = null;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const j = await api.get(`/website/jobs/${jobId}`);
+          if (j.data.status === "done") { done = j.data; break; }
+          if (j.data.status === "error") {
+            throw new Error(j.data.error || "Generation failed");
+          }
         }
+        
+        if (!done || !done.site_id) throw new Error("Generation failed");
+        
+        await fetchProjects();
+        const proj = await api.get(`/website/${done.site_id}`);
+        setCurrentProject(proj.data);
+        setViewState("editor");
+        toast.success("Your project is ready!");
+      } catch (err) {
+        toast.error(err?.response?.data?.detail || err.message || "Generation failed");
+      } finally {
+        setIsGenerating(false);
       }
-      
-      if (!done || !done.site_id) throw new Error("Generation failed");
-      
-      await fetchProjects();
-      const proj = await api.get(`/website/${done.site_id}`);
-      setCurrentProject(proj.data);
-      setViewState("editor");
-      toast.success("Your project is ready!");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "Generation failed");
-    } finally {
-      setIsGenerating(false);
-    }
+    });
   };
 
   const handleOpenProject = async (id) => {
@@ -95,30 +99,32 @@ export default function WebsitePage() {
     }
   };
 
-  const handleChat = async (id, prompt) => {
-    try {
-      const start = await api.post(`/website/${id}/chat`, { prompt });
-      const jobId = start.data.job_id;
-      
-      const deadline = Date.now() + 5 * 60 * 1000;
-      let done = null;
-      while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const j = await api.get(`/website/jobs/${jobId}`);
-        if (j.data.status === "done") { done = j.data; break; }
-        if (j.data.status === "error") {
-          throw new Error(j.data.error || "Edit failed");
+  const handleChat = (id, prompt) => {
+    requireKey(async () => {
+      try {
+        const start = await api.post(`/website/${id}/chat`, { prompt });
+        const jobId = start.data.job_id;
+        
+        const deadline = Date.now() + 5 * 60 * 1000;
+        let done = null;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const j = await api.get(`/website/jobs/${jobId}`);
+          if (j.data.status === "done") { done = j.data; break; }
+          if (j.data.status === "error") {
+            throw new Error(j.data.error || "Edit failed");
+          }
         }
+        
+        if (!done || !done.files) throw new Error("Edit failed");
+        
+        const proj = await api.get(`/website/${id}`);
+        setCurrentProject(proj.data);
+        toast.success("Project updated!");
+      } catch (err) {
+        toast.error(err?.response?.data?.detail || err.message || "AI Edit failed");
       }
-      
-      if (!done || !done.files) throw new Error("Edit failed");
-      
-      const proj = await api.get(`/website/${id}`);
-      setCurrentProject(proj.data);
-      toast.success("Project updated!");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "AI Edit failed");
-    }
+    });
   };
 
   if (viewState === "dashboard") {
