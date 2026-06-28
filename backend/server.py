@@ -395,19 +395,21 @@ async def generate_text_free(messages: list, user_id: Optional[str] = None) -> s
     user_keys = {}
     default_provider = "google"
     if user_id:
-        user_doc = await db.api_keys.find_one({"user_id": user_id})
-        if user_doc:
-            keys = user_doc.get("providers", {})
-            for k, v in keys.items():
-                if v.get("api_key"):
-                    user_keys[k] = {"api_key": decrypt_key(v["api_key"])}
         u = await db.users.find_one({"user_id": user_id})
-        if u and u.get("default_provider"):
-            default_provider = u["default_provider"]
+        if u:
+            # Support new unified Users table schema
+            if u.get("encrypted_api_key") and u.get("using_personal_key"):
+                prov = u.get("provider", "google")
+                user_keys[prov] = {"api_key": decrypt_key(u["encrypted_api_key"])}
+                default_provider = prov
+            
+            # Support legacy/multiple providers if still requested in the future
+            elif u.get("default_provider"):
+                default_provider = u["default_provider"]
             
     try:
         return await ProviderManager.execute_text(
-            messages, user_keys, default_provider=default_provider, system_fallback=True
+            messages, user_keys, default_provider=default_provider, system_fallback=False
         )
     except Exception as e:
         logger.error(f"Text generation failed: {e}")
@@ -431,15 +433,14 @@ async def gen_image(prompt: str, aspect_ratio: str = "1:1", files_data: list = N
         user_keys = {}
         default_provider = "google"
         if user_id:
-            user_doc = await db.api_keys.find_one({"user_id": user_id})
-            if user_doc:
-                keys = user_doc.get("providers", {})
-                for k, v in keys.items():
-                    if v.get("api_key"):
-                        user_keys[k] = {"api_key": decrypt_key(v["api_key"])}
             u = await db.users.find_one({"user_id": user_id})
-            if u and u.get("default_provider"):
-                default_provider = u["default_provider"]
+            if u:
+                if u.get("encrypted_api_key") and u.get("using_personal_key"):
+                    prov = u.get("provider", "google")
+                    user_keys[prov] = {"api_key": decrypt_key(u["encrypted_api_key"])}
+                    default_provider = prov
+                elif u.get("default_provider"):
+                    default_provider = u["default_provider"]
                 
         # Handle files_data enhancement if needed
         final_prompt = prompt
@@ -448,7 +449,7 @@ async def gen_image(prompt: str, aspect_ratio: str = "1:1", files_data: list = N
             final_prompt = await generate_text_free([{"role": "user", "content": enhance_prompt}], user_id=user_id)
             
         b64 = await ProviderManager.execute_image(
-            final_prompt, user_keys, aspect_ratio, default_provider=default_provider, system_fallback=True
+            final_prompt, user_keys, aspect_ratio, default_provider=default_provider, system_fallback=False
         )
         if b64 and b64.startswith("data:"):
              return b64.split("base64,")[1]
@@ -1680,69 +1681,71 @@ async def admin_audit(_admin=Depends(require_admin)):
 
 
 @api.get("/settings/apikeys")
-async def get_apikeys(req: Request):
-    user = _get_user_from_request(req)
+async def get_apikeys(user: dict = Depends(get_current_user)):
     if not user:
          raise HTTPException(status_code=401, detail="Unauthorized")
     
-    keys = await db.api_keys.find_one({"user_id": user["user_id"]})
     u = await db.users.find_one({"user_id": user["user_id"]})
-    default_provider = u.get("default_provider", "google") if u else "google"
+    if not u:
+         return {"providers": {}, "default_provider": "google"}
     
-    if not keys:
-         return {"providers": {}, "default_provider": default_provider}
-         
     safe_providers = {}
-    for prov, data in keys.get("providers", {}).items():
-         safe_providers[prov] = {"has_key": bool(data.get("api_key"))}
-    return {"providers": safe_providers, "default_provider": default_provider}
+    if u.get("using_personal_key") and u.get("encrypted_api_key"):
+        prov = u.get("provider", "google")
+        safe_providers[prov] = {
+             "has_key": True,
+             "last_validated": u.get("last_validated"),
+             "updated_at": u.get("updated_at")
+        }
+    
+    return {"providers": safe_providers, "default_provider": u.get("provider", "google")}
 
 class DefaultProviderIn(BaseModel):
     provider: str
 
 @api.post("/settings/default_provider")
-async def set_default_provider(req: Request, data: DefaultProviderIn):
-    user = _get_user_from_request(req)
+async def set_default_provider(data: DefaultProviderIn, user: dict = Depends(get_current_user)):
     if not user:
          raise HTTPException(status_code=401, detail="Unauthorized")
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"default_provider": data.provider}})
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"provider": data.provider}})
     return {"status": "success"}
 
 @api.post("/settings/apikeys")
-async def save_apikey(req: Request, data: APIKeyUpdateIn):
-    user = _get_user_from_request(req)
+async def save_apikey(data: APIKeyUpdateIn, user: dict = Depends(get_current_user)):
     if not user:
          raise HTTPException(status_code=401, detail="Unauthorized")
          
     encrypted_key = encrypt_key(data.api_key)
     
-    await db.api_keys.update_one(
+    await db.users.update_one(
         {"user_id": user["user_id"]},
         {"$set": {
-            f"providers.{data.provider}": {
-                "api_key": encrypted_key,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-        }},
-        upsert=True
+            "provider": data.provider,
+            "encrypted_api_key": encrypted_key,
+            "using_personal_key": True,
+            "last_validated": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
     )
     return {"status": "success"}
 
 @api.delete("/settings/apikeys/{provider}")
-async def delete_apikey(req: Request, provider: str):
-    user = _get_user_from_request(req)
+async def delete_apikey(provider: str, user: dict = Depends(get_current_user)):
     if not user:
          raise HTTPException(status_code=401, detail="Unauthorized")
          
-    await db.api_keys.update_one(
+    await db.users.update_one(
         {"user_id": user["user_id"]},
-        {"$unset": {f"providers.{provider}": ""}}
+        {"$unset": {
+            "encrypted_api_key": "",
+            "using_personal_key": "",
+            "last_validated": ""
+        }}
     )
     return {"status": "success"}
 
 @api.post("/settings/apikeys/test")
-async def test_apikey(req: Request, data: APIKeyTestIn):
-    user = _get_user_from_request(req)
+async def test_apikey(data: APIKeyTestIn, user: dict = Depends(get_current_user)):
     if not user:
          raise HTTPException(status_code=401, detail="Unauthorized")
          
