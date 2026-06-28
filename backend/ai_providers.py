@@ -71,7 +71,7 @@ class GeminiProvider(AIProvider):
     async def generate_image(self, prompt: str, api_key: str, aspect_ratio: str = "1:1") -> Optional[str]:
         client = genai.Client(api_key=api_key)
         result = await client.aio.models.generate_images(
-            model='imagen-3.0-generate-002',
+            model='imagen-3.0-generate-001',
             prompt=prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1,
