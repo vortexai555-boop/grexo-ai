@@ -295,28 +295,7 @@ class ProviderManager:
                      logger.error(f"System Fallback Provider failed: {e}")
                      last_error = e
              else:
-                 # Try using pollinations text api which doesn't require an api key
-                 try:
-                     import httpx
-                     async with httpx.AsyncClient(timeout=120.0) as client:
-                         # Use OpenAI format for Pollinations
-                         pollinations_messages = []
-                         for m in messages:
-                             content = ""
-                             if isinstance(m["content"], str):
-                                 content = m["content"]
-                             elif isinstance(m["content"], list):
-                                 for c in m["content"]:
-                                     if c.get("type") == "text":
-                                         content += c["text"] + "\n"
-                             pollinations_messages.append({"role": m["role"], "content": content})
-                         
-                         res = await client.post("https://text.pollinations.ai/", json={"messages": pollinations_messages, "model": "openai"})
-                         res.raise_for_status()
-                         return res.text
-                 except Exception as e:
-                     logger.error(f"Pollinations Fallback failed: {e}")
-                     last_error = Exception("System fallback failed and no API keys were provided.")
+                 last_error = Exception("System fallback requested but GEMINI_API_KEY environment variable is not set.")
                  
         if last_error:
             raise last_error
