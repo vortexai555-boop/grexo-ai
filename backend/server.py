@@ -59,14 +59,6 @@ def decrypt_key(cipher_text: str) -> str:
     except Exception:
         return ""
 
-class APIKeyUpdateIn(BaseModel):
-    provider: str
-    api_key: str
-
-class APIKeyTestIn(BaseModel):
-    provider: str
-    api_key: str
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
@@ -392,24 +384,9 @@ async def llm_complete(system: str, user_text: str, session_id: Optional[str] = 
 from ai_providers import ProviderManager
 
 async def generate_text_free(messages: list, user_id: Optional[str] = None) -> str:
-    user_keys = {}
-    default_provider = "google"
-    if user_id:
-        u = await db.users.find_one({"user_id": user_id})
-        if u:
-            # Support new unified Users table schema
-            if u.get("encrypted_api_key") and u.get("using_personal_key"):
-                prov = u.get("provider", "google")
-                user_keys[prov] = {"api_key": decrypt_key(u["encrypted_api_key"])}
-                default_provider = prov
-            
-            # Support legacy/multiple providers if still requested in the future
-            elif u.get("default_provider"):
-                default_provider = u["default_provider"]
-            
     try:
         return await ProviderManager.execute_text(
-            messages, user_keys, default_provider=default_provider, system_fallback=True
+            messages, {}, default_provider="google", system_fallback=True
         )
     except Exception as e:
         logger.error(f"Text generation failed: {e}")
@@ -430,18 +407,6 @@ async def web_search(query: str):
 
 async def gen_image(prompt: str, aspect_ratio: str = "1:1", files_data: list = None, user_id: str = None):
     try:
-        user_keys = {}
-        default_provider = "google"
-        if user_id:
-            u = await db.users.find_one({"user_id": user_id})
-            if u:
-                if u.get("encrypted_api_key") and u.get("using_personal_key"):
-                    prov = u.get("provider", "google")
-                    user_keys[prov] = {"api_key": decrypt_key(u["encrypted_api_key"])}
-                    default_provider = prov
-                elif u.get("default_provider"):
-                    default_provider = u["default_provider"]
-                
         # Handle files_data enhancement if needed
         final_prompt = prompt
         if files_data:
@@ -449,7 +414,7 @@ async def gen_image(prompt: str, aspect_ratio: str = "1:1", files_data: list = N
             final_prompt = await generate_text_free([{"role": "user", "content": enhance_prompt}], user_id=user_id)
             
         b64 = await ProviderManager.execute_image(
-            final_prompt, user_keys, aspect_ratio, default_provider=default_provider, system_fallback=False
+            final_prompt, {}, aspect_ratio, default_provider="google", system_fallback=True
         )
         if b64 and b64.startswith("data:"):
              return b64.split("base64,")[1]
@@ -1009,7 +974,7 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         f"Requirements: {description}. "
         f"You MUST generate a complete, production-ready full-stack project based on the user's requested technologies (e.g. React, Next.js, Node, Python, Postgres, Firebase, etc.). "
         f"The project MUST include: Entire folder structure, necessary Components, Pages, Routing, Authentication (if implied), Database connection scripts, API layer, README, Dockerfile, and GitHub Actions workflow if applicable. "
-        f"Return the code for EVERY required file. Wrap each file inside an XML-like block exactly like this: <file path=\"relative/path/to/filename.ext\">...</file>. Do not use JSON. Do not write placeholder comments, implement the actual logic."
+        f"Return ONLY a valid JSON object where keys are the full relative file paths (e.g., 'src/App.jsx', 'package.json') and values are the string content of those files. Do NOT wrap the JSON in markdown code blocks. Start the response with {{ and end with }}. Do not include any other text."
     )
     try:
         user_content_parts = [{"type": "text", "text": prompt}]
@@ -1030,27 +995,20 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         ]
         out = await generate_text_free(messages, user_id=user_id)
         
+        import json
         import re
-        parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+path="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
-        for m in xml_matches:
-            name = m.group(1).strip()
-            content = m.group(2).strip()
-            if content.startswith("```"):
-                content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            parsed_files[name] = content
+        
+        # Strip markdown if present
+        if out.strip().startswith("```"):
+            out = re.sub(r'^```(?:json)?(.*?)```$', r'\1', out.strip(), flags=re.DOTALL | re.IGNORECASE).strip()
+        else:
+            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', out, re.DOTALL)
+            if match:
+                out = match.group(1).strip()
             
-        if not parsed_files:
-            # Fallback to try and extract <file name="..."> just in case
-            xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
-            for m in xml_matches:
-                name = m.group(1).strip()
-                content = m.group(2).strip()
-                if content.startswith("```"):
-                    content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-                parsed_files[name] = content
-
-        if not parsed_files:
+        parsed_files = json.loads(out)
+        
+        if not isinstance(parsed_files, dict) or not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
         files = parsed_files
@@ -1190,13 +1148,13 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
             "2. If a file is not mentioned in your response, it will be kept exactly as-is.\n"
             "3. Maintain the existing architecture, styling conventions, and project integrity.\n"
             "4. If your changes require new dependencies, you MUST also return the updated dependency file (e.g., package.json, requirements.txt, etc.).\n"
-            "5. Wrap each file inside an XML-like block exactly like this: <file path=\"relative/path.ext\">...</file>.\n"
+            "5. Return ONLY a valid JSON object where keys are the full relative file paths (e.g., 'src/App.jsx', 'package.json') and values are the string content of those files. Do NOT wrap the JSON in markdown code blocks. Start the response with { and end with }.\n"
             "6. Do NOT write placeholder comments; implement the requested changes fully."
         )
         
         current_code = f"Here are the current files:\n"
         for path, content in current_files.items():
-            current_code += f"<file path=\"{path}\">\n{content}\n</file>\n\n"
+            current_code += f"File: {path}\n```\n{content}\n```\n\n"
             
         # Add conversational memory context
         if chat_history:
@@ -1214,27 +1172,20 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         
         out = await generate_text_free(messages, user_id=user_id)
         
+        import json
         import re
-        parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+path="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
-        for m in xml_matches:
-            name = m.group(1).strip()
-            content = m.group(2).strip()
-            if content.startswith("```"):
-                content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            parsed_files[name] = content
+        
+        # Strip markdown if present
+        if out.strip().startswith("```"):
+            out = re.sub(r'^```(?:json)?(.*?)```$', r'\1', out.strip(), flags=re.DOTALL | re.IGNORECASE).strip()
+        else:
+            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', out, re.DOTALL)
+            if match:
+                out = match.group(1).strip()
+            
+        parsed_files = json.loads(out)
 
-        if not parsed_files:
-            # Fallback to name=""" 
-            xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
-            for m in xml_matches:
-                name = m.group(1).strip()
-                content = m.group(2).strip()
-                if content.startswith("```"):
-                    content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-                parsed_files[name] = content
-
-        if not parsed_files:
+        if not isinstance(parsed_files, dict) or not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
         final_files = current_files.copy()
@@ -1681,84 +1632,7 @@ async def admin_audit(_admin=Depends(require_admin)):
     return docs
 
 
-@api.get("/settings/apikeys")
-async def get_apikeys(user: dict = Depends(get_current_user)):
-    if not user:
-         raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    u = await db.users.find_one({"user_id": user["user_id"]})
-    if not u:
-         return {"providers": {}, "default_provider": "google"}
-    
-    safe_providers = {}
-    if u.get("using_personal_key") and u.get("encrypted_api_key"):
-        prov = u.get("provider", "google")
-        safe_providers[prov] = {
-             "has_key": True,
-             "last_validated": u.get("last_validated"),
-             "updated_at": u.get("updated_at")
-        }
-    
-    return {"providers": safe_providers, "default_provider": u.get("provider", "google")}
 
-class DefaultProviderIn(BaseModel):
-    provider: str
-
-@api.post("/settings/default_provider")
-async def set_default_provider(data: DefaultProviderIn, user: dict = Depends(get_current_user)):
-    if not user:
-         raise HTTPException(status_code=401, detail="Unauthorized")
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"provider": data.provider}})
-    return {"status": "success"}
-
-@api.post("/settings/apikeys")
-async def save_apikey(data: APIKeyUpdateIn, user: dict = Depends(get_current_user)):
-    if not user:
-         raise HTTPException(status_code=401, detail="Unauthorized")
-         
-    encrypted_key = encrypt_key(data.api_key)
-    
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {
-            "provider": data.provider,
-            "encrypted_api_key": encrypted_key,
-            "using_personal_key": True,
-            "last_validated": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    return {"status": "success"}
-
-@api.delete("/settings/apikeys/{provider}")
-async def delete_apikey(provider: str, user: dict = Depends(get_current_user)):
-    if not user:
-         raise HTTPException(status_code=401, detail="Unauthorized")
-         
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$unset": {
-            "encrypted_api_key": "",
-            "using_personal_key": "",
-            "last_validated": ""
-        }}
-    )
-    return {"status": "success"}
-
-@api.post("/settings/apikeys/test")
-async def test_apikey(data: APIKeyTestIn, user: dict = Depends(get_current_user)):
-    if not user:
-         raise HTTPException(status_code=401, detail="Unauthorized")
-         
-    try:
-         from ai_providers import ProviderFactory
-         provider = ProviderFactory.get_provider(data.provider)
-         resp = await provider.generate_text([{"role": "user", "content": "say hi"}], data.api_key)
-         if resp:
-             return {"status": "success"}
-         raise ValueError("Empty response")
-    except Exception as ex:
-         raise HTTPException(status_code=400, detail=str(ex))
 
 @api.get("/admin/projects")
 async def admin_get_projects(user=Depends(require_admin)):
