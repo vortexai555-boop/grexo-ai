@@ -943,18 +943,13 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         
         import re
         parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+        xml_matches = re.finditer(r'<file\s+name=["\']([^"\']+)["\']>\s*(.*?)\s*</file>', out, re.DOTALL | re.IGNORECASE)
         for m in xml_matches:
-            name = m.group(1).lower()
+            name = m.group(1)
             content = m.group(2).strip()
-            if content.startswith("```"):
-                content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            if "html" in name:
-                parsed_files["html"] = content
-            elif "css" in name:
-                parsed_files["css"] = content
-            elif "js" in name or "script" in name:
-                parsed_files["js"] = content
+            content = re.sub(r'^```[a-zA-Z]*\s*\n', '', content)
+            content = re.sub(r'\n```\s*$', '', content)
+            parsed_files[name] = content
             
         if not parsed_files:
             # Fallback to try and extract fenced code blocks if no XML tags found
@@ -985,10 +980,10 @@ async def _run_website_job(job_id: str, user_id: str, description: str, site_typ
         if not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
-        files = {
-            "html": parsed_files.get("html", "<h1>Generation Error</h1>"),
-            "css": parsed_files.get("css", "body { background: white; color: black; }"),
-            "js": parsed_files.get("js", "console.log('App loaded.');")
+        files = parsed_files if parsed_files else {
+            "index.html": "<h1>Generation Error</h1>",
+            "styles.css": "body { background: white; color: black; }",
+            "script.js": "console.log('App loaded.');"
         }
         
         site_id = new_id("site")
@@ -1124,18 +1119,13 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         
         import re
         parsed_files = {}
-        xml_matches = re.finditer(r'<file\s+name="([^"]+)">\s*(.*?)\s*</file>', out, re.DOTALL)
+        xml_matches = re.finditer(r'<file\s+name=["\']([^"\']+)["\']>\s*(.*?)\s*</file>', out, re.DOTALL | re.IGNORECASE)
         for m in xml_matches:
-            name = m.group(1).lower()
+            name = m.group(1)
             content = m.group(2).strip()
-            if content.startswith("```"):
-                content = re.sub(r'^```[a-zA-Z]*\n(.*?)\n```$', r'\1', content, flags=re.DOTALL)
-            if "html" in name:
-                parsed_files["html"] = content
-            elif "css" in name:
-                parsed_files["css"] = content
-            elif "js" in name or "script" in name:
-                parsed_files["js"] = content
+            content = re.sub(r'^```[a-zA-Z]*\s*\n', '', content)
+            content = re.sub(r'\n```\s*$', '', content)
+            parsed_files[name] = content
                 
         if not parsed_files:
             code_blocks = re.finditer(r'```[a-zA-Z]*\s*\n(.*?)```', out, re.DOTALL)
@@ -1160,11 +1150,8 @@ async def _run_website_chat_job(job_id: str, user_id: str, site_id: str, prompt:
         if not parsed_files:
             raise ValueError("The generation model did not return a valid format.")
             
-        final_files = {
-            "html": parsed_files.get("html", current_files.get("html", "")),
-            "css": parsed_files.get("css", current_files.get("css", "")),
-            "js": parsed_files.get("js", current_files.get("js", ""))
-        }
+        final_files = current_files.copy()
+        final_files.update(parsed_files)
         
         await db.websites.update_one(
             {"id": site_id, "user_id": user_id},
