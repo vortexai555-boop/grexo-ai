@@ -1,9 +1,9 @@
 import axios from "axios";
 
-const BACKEND_URL = "https://vortex-ai-9vtl.onrender.com";
+const BACKEND_URL = process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "https://vortex-ai-9vtl.onrender.com";
 export const API = `${BACKEND_URL}/api`;
 
-const api = axios.create({ baseURL: API, withCredentials: true });
+const api = axios.create({ baseURL: API });
 
 api.interceptors.request.use((cfg) => {
   const token = localStorage.getItem("Grexo_token");
@@ -21,5 +21,4 @@ api.interceptors.response.use(
   }
 );
 
-export { api };
 export default api;
