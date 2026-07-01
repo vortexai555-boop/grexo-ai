@@ -1614,6 +1614,9 @@ async def seed_admin():
 async def shutdown_db():
     client.close()
 
+from tts.router import tts_router
+api.include_router(tts_router)
+
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
